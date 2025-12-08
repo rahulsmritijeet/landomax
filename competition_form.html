@@ -44,31 +44,89 @@
                     <label class="form-label">
                         Event Name <span class="required">*</span>
                     </label>
-                    <input type="text" id="eventName" class="form-control" required placeholder="e.g., ATL Marathon">
+                    <input type="text" id="eventName" class="form-control" required placeholder="e.g., ATL Marathon 2024">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">
-                            Date <span class="required">*</span>
+                            Start Date <span class="required">*</span>
                         </label>
                         <input type="date" id="eventDate" class="form-control" required>
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label">End Date</label>
+                        <input type="date" id="endDate" class="form-control">
+                        <small class="form-hint">Leave empty for single-day events</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
                         <label class="form-label">Location</label>
-                        <input type="text" id="location" class="form-control" placeholder="e.g., New Delhi">
+                        <input type="text" id="location" class="form-control" placeholder="e.g., New Delhi, Online">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="status" class="form-control">
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Ongoing">Ongoing</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Details</label>
-                    <textarea id="details" class="form-control" placeholder="Event details, requirements, registration info..."></textarea>
+                    <textarea id="details" class="form-control" placeholder="Event details, requirements, registration info, links..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Participants / Team Members</label>
+                    <input type="text" id="participants" class="form-control" placeholder="e.g., John, Jane, Alex">
+                </div>
+
+                <div class="form-section" id="resultSection">
+                    <h3 class="form-section-title">🏆 Results (Optional)</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Position / Achievement</label>
+                            <select id="position" class="form-control">
+                                <option value="">-- Not Yet --</option>
+                                <option value="1st Place">🥇 1st Place</option>
+                                <option value="2nd Place">🥈 2nd Place</option>
+                                <option value="3rd Place">🥉 3rd Place</option>
+                                <option value="Finalist">🏅 Finalist</option>
+                                <option value="Semi-Finalist">Semi-Finalist</option>
+                                <option value="Participated">Participated</option>
+                                <option value="Special Mention">⭐ Special Mention</option>
+                                <option value="Best Innovation">💡 Best Innovation</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Result Summary</label>
+                            <input type="text" id="result" class="form-control" placeholder="e.g., Won Best Innovation Award">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Additional Notes</label>
+                        <textarea id="notes" class="form-control" placeholder="Feedback, learnings, future improvements..."></textarea>
+                    </div>
                 </div>
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-success">
                         <span>💾</span> Save Competition
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="addToGoogleCalendar()">
+                        <span>📅</span> Add to Google Calendar
                     </button>
                     <a href="competitions.html" class="btn btn-secondary">
                         <span>❌</span> Cancel
