@@ -50,7 +50,24 @@
 
                     <div class="form-group">
                         <label class="form-label">Type</label>
-                        <input type="text" id="type" class="form-control" placeholder="e.g., Microcontroller, Sensor, Motor">
+                        <input type="text" id="type" class="form-control" placeholder="e.g., Microcontroller, Sensor, Motor" list="typesList">
+                        <datalist id="typesList">
+                            <option value="Microcontroller">
+                            <option value="Sensor">
+                            <option value="Motor">
+                            <option value="LED">
+                            <option value="Resistor">
+                            <option value="Capacitor">
+                            <option value="Wire">
+                            <option value="Connector">
+                            <option value="Display">
+                            <option value="Power Supply">
+                            <option value="Battery">
+                            <option value="Module">
+                            <option value="Board">
+                            <option value="Tool">
+                            <option value="Other">
+                        </datalist>
                     </div>
                 </div>
 
@@ -60,8 +77,14 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Image URL</label>
-                    <input type="url" id="imageUrl" class="form-control" placeholder="https://example.com/image.jpg">
+                    <label class="form-label">
+                        Quantity <span class="required">*</span>
+                    </label>
+                    <div class="quantity-input-group">
+                        <button type="button" class="quantity-btn-form" onclick="decrementQuantity()">−</button>
+                        <input type="number" id="quantity" class="form-control quantity-field" required min="0" value="1">
+                        <button type="button" class="quantity-btn-form" onclick="incrementQuantity()">+</button>
+                    </div>
                 </div>
 
                 <div class="form-actions">
@@ -80,6 +103,17 @@
     <script src="js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', loadComponentForm);
+        
+        function incrementQuantity() {
+            const input = document.getElementById('quantity');
+            input.value = parseInt(input.value || 0) + 1;
+        }
+        
+        function decrementQuantity() {
+            const input = document.getElementById('quantity');
+            const newVal = parseInt(input.value || 0) - 1;
+            input.value = newVal >= 0 ? newVal : 0;
+        }
     </script>
 </body>
 </html>
