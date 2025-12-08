@@ -6,6 +6,8 @@
     <title>Components - ATL Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
     <!-- Loader -->
@@ -34,11 +36,80 @@
     <main class="container">
         <div class="page-header">
             <h1 class="page-title">⚙️ Components</h1>
-            <a href="component_form.html" class="btn btn-primary">
-                <span>➕</span> Add Component
-            </a>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="openExcelUploadModal()">
+                    <span>📊</span> Import Excel
+                </button>
+                <a href="component_form.html" class="btn btn-primary">
+                    <span>➕</span> Add Component
+                </a>
+            </div>
         </div>
 
+        <!-- Excel Upload Section -->
+        <div class="card upload-card" id="uploadCard" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">📊 Import Components from Excel</h3>
+                <button class="btn btn-sm btn-secondary" onclick="closeExcelUpload()">✕ Close</button>
+            </div>
+            
+            <div class="upload-section">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📁</div>
+                    <h4>Drop Excel file here or click to browse</h4>
+                    <p>Supports .xlsx, .xls, .csv files</p>
+                    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(event)" hidden>
+                    <button class="btn btn-primary" onclick="document.getElementById('excelFile').click()">
+                        Choose File
+                    </button>
+                </div>
+                
+                <div class="ai-info">
+                    <h4>🤖 AI-Powered Auto-Detection</h4>
+                    <p>Our smart parser will automatically detect and map columns like:</p>
+                    <ul>
+                        <li><strong>Name/Component Name/Item</strong> → Component Name</li>
+                        <li><strong>Type/Category/Kind</strong> → Type</li>
+                        <li><strong>Description/Details/Info</strong> → Description</li>
+                        <li><strong>Qty/Quantity/Count/Stock</strong> → Quantity</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Preview Section -->
+            <div id="previewSection" style="display: none;">
+                <div class="card-header">
+                    <h3 class="card-title">📋 Preview Import Data</h3>
+                    <span class="badge" id="rowCount">0 rows</span>
+                </div>
+                
+                <!-- Column Mapping -->
+                <div class="mapping-section">
+                    <h4>🔗 Column Mapping (AI Suggested)</h4>
+                    <p class="mapping-info">Adjust mappings if needed:</p>
+                    <div class="mapping-grid" id="mappingGrid"></div>
+                </div>
+                
+                <!-- Data Preview Table -->
+                <div class="table-container preview-table">
+                    <table>
+                        <thead id="previewHead"></thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn btn-success" onclick="importComponents()">
+                        <span>✅</span> Import <span id="importCount">0</span> Components
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearPreview()">
+                        <span>🔄</span> Clear & Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Components Table -->
         <div class="card">
             <div class="table-container">
                 <table>
@@ -48,7 +119,7 @@
                             <th>Component Name</th>
                             <th>Type</th>
                             <th>Description</th>
-                            <th>Image</th>
+                            <th>Quantity</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -62,10 +133,55 @@
         </div>
     </main>
 
+    <!-- Quantity Modal -->
+    <div class="modal" id="quantityModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3>📦 Update Quantity</h3>
+                <button class="modal-close" onclick="closeQuantityModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="quantityComponentName" class="quantity-component-name"></p>
+                <div class="quantity-controls">
+                    <button class="btn btn-secondary quantity-btn" onclick="adjustQuantity(-10)">-10</button>
+                    <button class="btn btn-secondary quantity-btn" onclick="adjustQuantity(-1)">-1</button>
+                    <input type="number" id="quantityInput" class="quantity-input" min="0" value="0">
+                    <button class="btn btn-secondary quantity-btn" onclick="adjustQuantity(1)">+1</button>
+                    <button class="btn btn-secondary quantity-btn" onclick="adjustQuantity(10)">+10</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="saveQuantity()">Save</button>
+                <button class="btn btn-secondary" onclick="closeQuantityModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', loadComponents);
+        
+        // Drag and drop functionality
+        const uploadZone = document.getElementById('uploadZone');
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleExcelFile(files[0]);
+            }
+        });
     </script>
 </body>
 </html>
