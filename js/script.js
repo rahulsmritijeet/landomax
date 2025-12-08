@@ -123,7 +123,6 @@ async function loadProjectForm() {
     const projectId = getUrlParam('id');
     const formTitle = document.getElementById('formTitle');
     
-    // Load components for multi-select
     await loadComponentsMultiSelect();
     
     if (projectId) {
@@ -137,7 +136,6 @@ async function loadProjectForm() {
                 document.getElementById('overview').value = result.data.Overview || '';
                 document.getElementById('code').value = result.data.Code || '';
                 
-                // Set selected components
                 if (result.data.ComponentsUsed) {
                     const selectedComponents = result.data.ComponentsUsed.split(',').map(c => c.trim());
                     const checkboxes = document.querySelectorAll('#componentsUsed input[type="checkbox"]');
@@ -166,7 +164,7 @@ async function loadComponentsMultiSelect() {
             container.innerHTML = result.data.map(comp => `
                 <label class="checkbox-label">
                     <input type="checkbox" name="components" value="${comp.ComponentID}">
-                    ${comp.ComponentID} - ${comp.ComponentName}
+                    ${comp.ComponentID} - ${comp.ComponentName} (Qty: ${comp.Quantity || 0})
                 </label>
             `).join('');
         } else {
@@ -226,8 +224,13 @@ async function deleteProject(id) {
 }
 
 // =====================================================
-// COMPONENTS MODULE
+// COMPONENTS MODULE (Updated with Excel Import)
 // =====================================================
+
+// Store parsed Excel data
+let parsedExcelData = [];
+let columnMapping = {};
+let excelHeaders = [];
 
 async function loadComponents() {
     showLoading();
@@ -239,13 +242,19 @@ async function loadComponents() {
         if (result.data && result.data.length > 0) {
             result.data.forEach(component => {
                 const row = document.createElement('tr');
+                const quantity = parseInt(component.Quantity) || 0;
+                const quantityClass = quantity <= 0 ? 'qty-zero' : quantity <= 5 ? 'qty-low' : 'qty-ok';
+                
                 row.innerHTML = `
                     <td>${component.ComponentID}</td>
-                    <td>${component.ComponentName}</td>
+                    <td><strong>${component.ComponentName}</strong></td>
                     <td>${component.Type || '-'}</td>
                     <td>${component.Description ? component.Description.substring(0, 50) + '...' : '-'}</td>
                     <td>
-                        ${component.ImageURL ? `<img src="${component.ImageURL}" alt="${component.ComponentName}" class="thumbnail">` : '-'}
+                        <span class="quantity-badge ${quantityClass}" onclick="openQuantityModal('${component.ComponentID}', '${escapeHtml(component.ComponentName)}', ${quantity})">
+                            ${quantity}
+                            <span class="qty-edit-icon">✏️</span>
+                        </span>
                     </td>
                     <td class="actions">
                         <button class="btn btn-sm btn-primary" onclick="editComponent('${component.ComponentID}')">
@@ -264,6 +273,12 @@ async function loadComponents() {
     hideLoading();
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/'/g, "\\'");
+}
+
 async function loadComponentForm() {
     const componentId = getUrlParam('id');
     const formTitle = document.getElementById('formTitle');
@@ -278,7 +293,7 @@ async function loadComponentForm() {
                 document.getElementById('componentName').value = result.data.ComponentName || '';
                 document.getElementById('type').value = result.data.Type || '';
                 document.getElementById('description').value = result.data.Description || '';
-                document.getElementById('imageUrl').value = result.data.ImageURL || '';
+                document.getElementById('quantity').value = result.data.Quantity || 0;
             }
         } catch (error) {
             console.error('Error loading component:', error);
@@ -299,7 +314,7 @@ async function saveComponent(event) {
         ComponentName: document.getElementById('componentName').value,
         Type: document.getElementById('type').value,
         Description: document.getElementById('description').value,
-        ImageURL: document.getElementById('imageUrl').value
+        Quantity: parseInt(document.getElementById('quantity').value) || 0
     };
     
     try {
@@ -322,6 +337,348 @@ function editComponent(id) {
 }
 
 // =====================================================
+// Quantity Modal Functions
+// =====================================================
+
+let currentQuantityComponentId = null;
+
+function openQuantityModal(componentId, componentName, currentQuantity) {
+    currentQuantityComponentId = componentId;
+    document.getElementById('quantityComponentName').textContent = componentName;
+    document.getElementById('quantityInput').value = currentQuantity;
+    document.getElementById('quantityModal').classList.add('show');
+}
+
+function closeQuantityModal() {
+    document.getElementById('quantityModal').classList.remove('show');
+    currentQuantityComponentId = null;
+}
+
+function adjustQuantity(amount) {
+    const input = document.getElementById('quantityInput');
+    const newValue = Math.max(0, parseInt(input.value || 0) + amount);
+    input.value = newValue;
+}
+
+async function saveQuantity() {
+    if (!currentQuantityComponentId) return;
+    
+    const newQuantity = parseInt(document.getElementById('quantityInput').value) || 0;
+    
+    showLoading();
+    try {
+        await apiCall('updateComponentQuantity', { 
+            id: currentQuantityComponentId, 
+            quantity: newQuantity 
+        });
+        showNotification('Quantity updated successfully!');
+        closeQuantityModal();
+        loadComponents();
+    } catch (error) {
+        console.error('Error updating quantity:', error);
+    }
+    hideLoading();
+}
+
+// =====================================================
+// Excel Import Functions
+// =====================================================
+
+function openExcelUploadModal() {
+    document.getElementById('uploadCard').style.display = 'block';
+    document.getElementById('uploadCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function closeExcelUpload() {
+    document.getElementById('uploadCard').style.display = 'none';
+    clearPreview();
+}
+
+function handleExcelUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        handleExcelFile(file);
+    }
+}
+
+function handleExcelFile(file) {
+    const validTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv'
+    ];
+    
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!validExtensions.includes(fileExtension)) {
+        showNotification('Please upload a valid Excel file (.xlsx, .xls, .csv)', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // Get first sheet
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            
+            // Convert to JSON
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            
+            if (jsonData.length < 2) {
+                showNotification('Excel file is empty or has no data rows', 'error');
+                hideLoading();
+                return;
+            }
+            
+            // Process with AI mapping
+            processExcelData(jsonData);
+            hideLoading();
+            
+        } catch (error) {
+            console.error('Error parsing Excel:', error);
+            showNotification('Error parsing Excel file: ' + error.message, 'error');
+            hideLoading();
+        }
+    };
+    
+    reader.readAsArrayBuffer(file);
+}
+
+function processExcelData(jsonData) {
+    // First row is headers
+    excelHeaders = jsonData[0].map(h => (h || '').toString().trim());
+    
+    // Data rows
+    const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== ''));
+    
+    // AI-powered column mapping
+    columnMapping = autoDetectColumns(excelHeaders);
+    
+    // Store parsed data
+    parsedExcelData = dataRows.map(row => {
+        const obj = {};
+        excelHeaders.forEach((header, index) => {
+            obj[header] = row[index] !== undefined ? row[index] : '';
+        });
+        return obj;
+    });
+    
+    // Show preview
+    showPreview();
+}
+
+function autoDetectColumns(headers) {
+    const mapping = {
+        ComponentName: null,
+        Type: null,
+        Description: null,
+        Quantity: null
+    };
+    
+    // Patterns for AI detection
+    const patterns = {
+        ComponentName: [
+            /^name$/i, /component\s*name/i, /^item$/i, /item\s*name/i, 
+            /product\s*name/i, /^component$/i, /^part$/i, /part\s*name/i,
+            /material/i, /^title$/i
+        ],
+        Type: [
+            /^type$/i, /^category$/i, /^kind$/i, /component\s*type/i,
+            /^class$/i, /classification/i, /^group$/i
+        ],
+        Description: [
+            /^description$/i, /^details$/i, /^info$/i, /^notes$/i,
+            /^specification/i, /^specs$/i, /^about$/i, /^remarks$/i
+        ],
+        Quantity: [
+            /^qty$/i, /^quantity$/i, /^count$/i, /^stock$/i, /^amount$/i,
+            /^no\.?$/i, /^number$/i, /^units$/i, /in\s*stock/i, /available/i
+        ]
+    };
+    
+    // Match headers to fields
+    headers.forEach((header, index) => {
+        const headerLower = header.toLowerCase().trim();
+        
+        for (const [field, fieldPatterns] of Object.entries(patterns)) {
+            if (mapping[field] === null) {
+                for (const pattern of fieldPatterns) {
+                    if (pattern.test(headerLower)) {
+                        mapping[field] = index;
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    
+    // Fallback: if no name found, use first text column
+    if (mapping.ComponentName === null) {
+        mapping.ComponentName = 0;
+    }
+    
+    return mapping;
+}
+
+function showPreview() {
+    document.getElementById('previewSection').style.display = 'block';
+    document.getElementById('rowCount').textContent = `${parsedExcelData.length} rows detected`;
+    document.getElementById('importCount').textContent = parsedExcelData.length;
+    
+    // Build mapping UI
+    const mappingGrid = document.getElementById('mappingGrid');
+    mappingGrid.innerHTML = '';
+    
+    const fields = ['ComponentName', 'Type', 'Description', 'Quantity'];
+    const fieldLabels = {
+        ComponentName: '📦 Component Name *',
+        Type: '🏷️ Type',
+        Description: '📝 Description',
+        Quantity: '🔢 Quantity'
+    };
+    
+    fields.forEach(field => {
+        const div = document.createElement('div');
+        div.className = 'mapping-item';
+        div.innerHTML = `
+            <label>${fieldLabels[field]}</label>
+            <select id="map_${field}" onchange="updatePreview()">
+                <option value="-1">-- Skip --</option>
+                ${excelHeaders.map((h, i) => `
+                    <option value="${i}" ${columnMapping[field] === i ? 'selected' : ''}>
+                        ${h || `Column ${i + 1}`}
+                    </option>
+                `).join('')}
+            </select>
+        `;
+        mappingGrid.appendChild(div);
+    });
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    // Update mapping from selects
+    columnMapping.ComponentName = parseInt(document.getElementById('map_ComponentName').value);
+    columnMapping.Type = parseInt(document.getElementById('map_Type').value);
+    columnMapping.Description = parseInt(document.getElementById('map_Description').value);
+    columnMapping.Quantity = parseInt(document.getElementById('map_Quantity').value);
+    
+    // Build preview table
+    const thead = document.getElementById('previewHead');
+    const tbody = document.getElementById('previewBody');
+    
+    thead.innerHTML = `
+        <tr>
+            <th>#</th>
+            <th>Component Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Quantity</th>
+        </tr>
+    `;
+    
+    tbody.innerHTML = '';
+    
+    // Show first 10 rows
+    const previewRows = parsedExcelData.slice(0, 10);
+    
+    previewRows.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        
+        const name = getMappedValue(row, 'ComponentName');
+        const type = getMappedValue(row, 'Type');
+        const desc = getMappedValue(row, 'Description');
+        const qty = getMappedValue(row, 'Quantity');
+        
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${name || '<em class="text-muted">Empty</em>'}</td>
+            <td>${type || '-'}</td>
+            <td>${desc ? (desc.length > 30 ? desc.substring(0, 30) + '...' : desc) : '-'}</td>
+            <td>${qty || 0}</td>
+        `;
+        
+        if (!name) {
+            tr.classList.add('row-warning');
+        }
+        
+        tbody.appendChild(tr);
+    });
+    
+    if (parsedExcelData.length > 10) {
+        tbody.innerHTML += `
+            <tr class="more-rows">
+                <td colspan="5">... and ${parsedExcelData.length - 10} more rows</td>
+            </tr>
+        `;
+    }
+}
+
+function getMappedValue(row, field) {
+    const colIndex = columnMapping[field];
+    if (colIndex === -1 || colIndex === null || colIndex === undefined) return '';
+    
+    const header = excelHeaders[colIndex];
+    let value = row[header];
+    
+    if (value === undefined || value === null) return '';
+    return String(value).trim();
+}
+
+function clearPreview() {
+    document.getElementById('previewSection').style.display = 'none';
+    document.getElementById('excelFile').value = '';
+    parsedExcelData = [];
+    columnMapping = {};
+    excelHeaders = [];
+}
+
+async function importComponents() {
+    if (parsedExcelData.length === 0) {
+        showNotification('No data to import', 'error');
+        return;
+    }
+    
+    // Prepare components array
+    const components = parsedExcelData.map(row => ({
+        ComponentName: getMappedValue(row, 'ComponentName'),
+        Type: getMappedValue(row, 'Type'),
+        Description: getMappedValue(row, 'Description'),
+        Quantity: parseInt(getMappedValue(row, 'Quantity')) || 0
+    })).filter(c => c.ComponentName); // Filter out rows without name
+    
+    if (components.length === 0) {
+        showNotification('No valid components found. Make sure Component Name is mapped.', 'error');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to import ${components.length} components?`)) {
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const result = await apiCall('bulkAddComponents', { data: components });
+        showNotification(`Successfully imported ${result.addedCount} components!`);
+        closeExcelUpload();
+        loadComponents();
+    } catch (error) {
+        console.error('Error importing components:', error);
+    }
+    
+    hideLoading();
+}
+
+// =====================================================
 // COMPETITIONS MODULE
 // =====================================================
 
@@ -335,7 +692,6 @@ async function loadCompetitions() {
         calendarView.innerHTML = '';
         
         if (result.data && result.data.length > 0) {
-            // Table View
             result.data.forEach(competition => {
                 const row = document.createElement('tr');
                 const eventDate = new Date(competition.Date);
@@ -360,7 +716,6 @@ async function loadCompetitions() {
                 tbody.appendChild(row);
             });
             
-            // Calendar View
             result.data.forEach(competition => {
                 const card = document.createElement('div');
                 const eventDate = new Date(competition.Date);
@@ -528,13 +883,9 @@ async function loadOrderForm() {
     const orderId = getUrlParam('id');
     const formTitle = document.getElementById('formTitle');
     
-    // Load components dropdown
     await loadComponentsDropdown();
-    
-    // Load status dropdown
     loadStatusDropdown();
     
-    // Set default order date to today
     const orderDateInput = document.getElementById('orderDate');
     if (!orderId && orderDateInput) {
         orderDateInput.value = new Date().toISOString().split('T')[0];
@@ -576,7 +927,7 @@ async function loadComponentsDropdown() {
             result.data.forEach(comp => {
                 const option = document.createElement('option');
                 option.value = comp.ComponentID;
-                option.textContent = `${comp.ComponentID} - ${comp.ComponentName}`;
+                option.textContent = `${comp.ComponentID} - ${comp.ComponentName} (Stock: ${comp.Quantity || 0})`;
                 option.dataset.name = comp.ComponentName;
                 select.appendChild(option);
             });
