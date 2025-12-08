@@ -6,7 +6,6 @@
     <title>Components - ATL Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- SheetJS for Excel parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -43,6 +42,38 @@
                 <a href="component_form.html" class="btn btn-primary">
                     <span>➕</span> Add Component
                 </a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="componentStats">
+            <div class="stat-card">
+                <div class="stat-icon">📦</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalComponents">0</span>
+                    <span class="stat-label">Total Components</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="inStockCount">0</span>
+                    <span class="stat-label">In Stock</span>
+                </div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="lowStockCount">0</span>
+                    <span class="stat-label">Low Stock (≤5)</span>
+                </div>
+            </div>
+            <div class="stat-card danger">
+                <div class="stat-icon">❌</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="outOfStockCount">0</span>
+                    <span class="stat-label">Out of Stock</span>
+                </div>
             </div>
         </div>
 
@@ -83,14 +114,12 @@
                     <span class="badge" id="rowCount">0 rows</span>
                 </div>
                 
-                <!-- Column Mapping -->
                 <div class="mapping-section">
                     <h4>🔗 Column Mapping (AI Suggested)</h4>
                     <p class="mapping-info">Adjust mappings if needed:</p>
                     <div class="mapping-grid" id="mappingGrid"></div>
                 </div>
                 
-                <!-- Data Preview Table -->
                 <div class="table-container preview-table">
                     <table>
                         <thead id="previewHead"></thead>
@@ -111,6 +140,10 @@
 
         <!-- Components Table -->
         <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Component Inventory</h3>
+                <input type="text" id="searchComponents" class="search-input" placeholder="🔍 Search components..." oninput="searchComponents()">
+            </div>
             <div class="table-container">
                 <table>
                     <thead>
@@ -151,7 +184,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-success" onclick="saveQuantity()">Save</button>
+                <button class="btn btn-success" onclick="saveQuantity()">💾 Save</button>
                 <button class="btn btn-secondary" onclick="closeQuantityModal()">Cancel</button>
             </div>
         </div>
@@ -162,7 +195,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', loadComponents);
         
-        // Drag and drop functionality
         const uploadZone = document.getElementById('uploadZone');
         
         uploadZone.addEventListener('dragover', (e) => {
