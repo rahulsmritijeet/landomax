@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitions - ATL Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🔬</div>
+                ATL Dashboard
+            </div>
+            <nav class="nav">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="projects.html" class="nav-link">Projects</a>
+                <a href="components.html" class="nav-link">Components</a>
+                <a href="competitions.html" class="nav-link active">Competitions</a>
+                <a href="orders.html" class="nav-link">Orders</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <div class="page-header">
+            <h1 class="page-title">🏆 Competitions</h1>
+            <div class="header-actions">
+                <div class="view-toggle">
+                    <button id="tableViewBtn" class="btn btn-sm active" onclick="toggleView('table')">📋 Table</button>
+                    <button id="calendarViewBtn" class="btn btn-sm" onclick="toggleView('calendar')">📅 Calendar</button>
+                </div>
+                <a href="competition_form.html" class="btn btn-primary">
+                    <span>➕</span> Add Competition
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="competitionStats">
+            <div class="stat-card upcoming">
+                <div class="stat-icon">📅</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="upcomingCount">0</span>
+                    <span class="stat-label">Upcoming</span>
+                </div>
+            </div>
+            <div class="stat-card ongoing">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="ongoingCount">0</span>
+                    <span class="stat-label">Ongoing</span>
+                </div>
+            </div>
+            <div class="stat-card completed">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="completedCount">0</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+            </div>
+            <div class="stat-card wins">
+                <div class="stat-icon">🥇</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="winsCount">0</span>
+                    <span class="stat-label">Wins/Top 3</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterCompetitions('all')">All</button>
+            <button class="filter-tab" onclick="filterCompetitions('upcoming')">Upcoming</button>
+            <button class="filter-tab" onclick="filterCompetitions('ongoing')">Ongoing</button>
+            <button class="filter-tab" onclick="filterCompetitions('completed')">Completed</button>
+        </div>
+
+        <!-- Table View -->
+        <div class="card" id="tableView">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Event ID</th>
+                            <th>Event Name</th>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Result</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="competitionsTableBody">
+                        <tr>
+                            <td colspan="7" class="no-data">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="calendar-grid"></div>
+    </main>
+
+    <!-- Result Modal -->
+    <div class="modal" id="resultModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🏆 Update Competition Result</h3>
+                <button class="modal-close" onclick="closeResultModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <h4 id="resultEventName" class="result-event-name"></h4>
+                
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="resultStatus" class="form-control">
+                        <option value="Upcoming">Upcoming</option>
+                        <option value="Ongoing">Ongoing</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Position / Achievement</label>
+                    <select id="resultPosition" class="form-control">
+                        <option value="">-- Select Position --</option>
+                        <option value="1st Place">🥇 1st Place</option>
+                        <option value="2nd Place">🥈 2nd Place</option>
+                        <option value="3rd Place">🥉 3rd Place</option>
+                        <option value="Finalist">🏅 Finalist</option>
+                        <option value="Semi-Finalist">Semi-Finalist</option>
+                        <option value="Quarter-Finalist">Quarter-Finalist</option>
+                        <option value="Participated">Participated</option>
+                        <option value="Special Mention">⭐ Special Mention</option>
+                        <option value="Best Innovation">💡 Best Innovation</option>
+                        <option value="Best Design">🎨 Best Design</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Result Details</label>
+                    <textarea id="resultDetails" class="form-control" placeholder="Describe the achievement, project presented, feedback received..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Additional Notes</label>
+                    <textarea id="resultNotes" class="form-control" placeholder="Any other notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="saveResult()">💾 Save Result</button>
+                <button class="btn btn-secondary" onclick="closeResultModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', loadCompetitions);
+    </script>
+</body>
+</html>
