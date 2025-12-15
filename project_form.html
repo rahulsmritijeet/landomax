@@ -54,13 +54,71 @@
 
                 <div class="form-group">
                     <label class="form-label">Code / Notes</label>
-                    <textarea id="code" class="form-control" placeholder="Code snippets, links, or additional notes" style="min-height: 150px; font-family: monospace;"></textarea>
+                    <textarea id="code" class="form-control code-textarea" placeholder="Code snippets, links, or additional notes"></textarea>
                 </div>
 
+                <!-- Enhanced Components Selection -->
                 <div class="form-group">
-                    <label class="form-label">Components Used</label>
-                    <div id="componentsUsed" class="checkbox-group">
-                        <p class="no-data">Loading components...</p>
+                    <label class="form-label">
+                        Components Used
+                        <span class="selected-count" id="selectedCount">(0 selected)</span>
+                    </label>
+                    
+                    <!-- Search Bar -->
+                    <div class="component-search-wrapper">
+                        <div class="search-input-container">
+                            <span class="search-icon">🔍</span>
+                            <input 
+                                type="text" 
+                                id="componentSearch" 
+                                class="search-input-field" 
+                                placeholder="Search components by name, type, or ID..."
+                                oninput="searchComponentsInForm(this.value)"
+                                autocomplete="off"
+                            >
+                            <button type="button" class="clear-search-btn" onclick="clearComponentSearch()" title="Clear search">✕</button>
+                        </div>
+                        
+                        <!-- Quick Filters -->
+                        <div class="quick-filters">
+                            <button type="button" class="filter-chip active" onclick="filterByType('all')">All</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('Microcontroller')">🎛️ Microcontroller</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('Sensor')">📡 Sensor</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('Motor')">⚙️ Motor</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('LED')">💡 LED</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('Module')">📦 Module</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('Wire')">🔌 Wire</button>
+                            <button type="button" class="filter-chip" onclick="filterByType('other')">📋 Other</button>
+                        </div>
+                        
+                        <!-- Selection Actions -->
+                        <div class="selection-actions">
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllVisible()">
+                                ☑️ Select All Visible
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAll()">
+                                ⬜ Deselect All
+                            </button>
+                            <span class="results-count" id="resultsCount">Loading...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Components List -->
+                    <div id="componentsUsed" class="checkbox-group enhanced">
+                        <div class="loading-components">
+                            <div class="spinner-small"></div>
+                            Loading components...
+                        </div>
+                    </div>
+                    
+                    <!-- Selected Components Preview -->
+                    <div class="selected-preview" id="selectedPreview">
+                        <div class="selected-preview-header">
+                            <span>📦 Selected Components:</span>
+                        </div>
+                        <div class="selected-chips" id="selectedChips">
+                            <span class="no-selection">No components selected</span>
+                        </div>
                     </div>
                 </div>
 
@@ -80,6 +138,14 @@
     <script src="js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', loadProjectForm);
+        
+        // Keyboard shortcut: Ctrl+F or Cmd+F to focus search
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                document.getElementById('componentSearch').focus();
+            }
+        });
     </script>
 </body>
 </html>
