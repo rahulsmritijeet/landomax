@@ -26,12 +26,23 @@
                 <a href="components.html" class="nav-link">Components</a>
                 <a href="competitions.html" class="nav-link">Competitions</a>
                 <a href="orders.html" class="nav-link">Orders</a>
+                <div class="nav-divider"></div>
+                <button class="nav-link logout-btn" onclick="logout()">🚪 Logout</button>
             </nav>
         </div>
     </header>
 
     <!-- Main Content -->
     <main class="container">
+        <!-- Welcome Banner -->
+        <div class="welcome-banner" id="welcomeBanner">
+            <div class="welcome-content">
+                <h2>👋 Welcome back!</h2>
+                <p>Session active • <span id="sessionInfo">Logged in</span></p>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="showChangePasswordModal()">🔑 Change Password</button>
+        </div>
+
         <section class="home-hero">
             <h1>Welcome to ATL Dashboard</h1>
             <p>Manage your Atal Tinkering Lab projects, components, competitions, and orders all in one place.</p>
@@ -64,7 +75,46 @@
         </div>
     </main>
 
+    <!-- Change Password Modal -->
+    <div class="modal" id="changePasswordModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3>🔑 Change Password</h3>
+                <button class="modal-close" onclick="closeChangePasswordModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="changePasswordForm" onsubmit="handleChangePassword(event)">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" id="currentPassword" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <input type="password" id="newPassword" class="form-control" required minlength="4">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" class="form-control" required>
+                    </div>
+                    <div class="password-error" id="passwordError"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="handleChangePassword(event)">💾 Change Password</button>
+                <button class="btn btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/script.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            updateSessionInfo();
+        });
+    </script>
 </body>
 </html>
