@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - ATL Dashboard</title>
-    <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Login Page Specific Styles */
-        body.login-page {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -63,23 +68,34 @@
             padding: 40px 30px;
         }
 
-        .login-form .form-group {
+        .form-group {
             margin-bottom: 24px;
         }
 
-        .login-form .form-label {
+        .form-label {
+            display: block;
             font-weight: 600;
             margin-bottom: 10px;
-            display: block;
             color: #374151;
         }
 
-        .password-input-wrapper {
+        .password-wrapper {
             position: relative;
         }
 
-        .password-input-wrapper input {
-            padding-right: 50px;
+        .form-control {
+            width: 100%;
+            padding: 14px 50px 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
 
         .toggle-password {
@@ -92,81 +108,12 @@
             cursor: pointer;
             font-size: 20px;
             opacity: 0.5;
-            transition: opacity 0.2s;
         }
 
         .toggle-password:hover {
             opacity: 1;
         }
 
-        .login-btn {
-            width: 100%;
-            padding: 16px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
-        }
-
-        .login-btn:active {
-            transform: translateY(0);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .login-btn .spinner-small {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-        }
-
-        .error-message {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 14px;
-            margin-bottom: 20px;
-            display: none;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .error-message.show {
-            display: flex;
-        }
-
-        .login-footer {
-            text-align: center;
-            padding: 20px 30px 30px;
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .login-footer a {
-            color: #4f46e5;
-            text-decoration: none;
-        }
-
-        /* Remember me checkbox */
         .remember-me {
             display: flex;
             align-items: center;
@@ -186,83 +133,83 @@
             cursor: pointer;
         }
 
-        /* Animated background */
-        .bg-shapes {
-            position: fixed;
-            top: 0;
-            left: 0;
+        .login-btn {
             width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: -1;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
-        .bg-shape {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            animation: float 20s infinite;
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
         }
 
-        .bg-shape:nth-child(1) {
-            width: 300px;
-            height: 300px;
-            top: -150px;
-            left: -150px;
-            animation-delay: 0s;
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .bg-shape:nth-child(2) {
-            width: 200px;
-            height: 200px;
-            bottom: -100px;
-            right: -100px;
-            animation-delay: 5s;
-        }
-
-        .bg-shape:nth-child(3) {
-            width: 150px;
-            height: 150px;
-            top: 50%;
-            right: 10%;
-            animation-delay: 10s;
-        }
-
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-30px) rotate(180deg);
-            }
-        }
-
-        /* Caps lock warning */
-        .caps-warning {
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
             display: none;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #fef3c7;
-            color: #d97706;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-top: 8px;
         }
 
-        .caps-warning.show {
-            display: flex;
+        .error-message.show {
+            display: block;
+        }
+
+        .login-footer {
+            text-align: center;
+            padding: 20px 30px 30px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Debug info */
+        .debug-info {
+            margin-top: 20px;
+            padding: 12px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #6b7280;
+            display: none;
+        }
+
+        .debug-info.show {
+            display: block;
         }
     </style>
 </head>
-<body class="login-page">
-    <!-- Animated Background -->
-    <div class="bg-shapes">
-        <div class="bg-shape"></div>
-        <div class="bg-shape"></div>
-        <div class="bg-shape"></div>
-    </div>
-
+<body>
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
@@ -272,15 +219,12 @@
             </div>
 
             <div class="login-body">
-                <div class="error-message" id="errorMessage">
-                    <span>⚠️</span>
-                    <span id="errorText">Invalid password. Please try again.</span>
-                </div>
+                <div class="error-message" id="errorMessage"></div>
 
                 <form id="loginForm" onsubmit="handleLogin(event)">
                     <div class="form-group">
                         <label class="form-label">🔒 Password</label>
-                        <div class="password-input-wrapper">
+                        <div class="password-wrapper">
                             <input 
                                 type="password" 
                                 id="password" 
@@ -288,14 +232,10 @@
                                 placeholder="Enter your password"
                                 required
                                 autofocus
-                                onkeyup="checkCapsLock(event)"
                             >
                             <button type="button" class="toggle-password" onclick="togglePassword()">
                                 👁️
                             </button>
-                        </div>
-                        <div class="caps-warning" id="capsWarning">
-                            <span>⚠️</span> Caps Lock is ON
                         </div>
                     </div>
 
@@ -305,20 +245,30 @@
                     </div>
 
                     <button type="submit" class="login-btn" id="loginBtn">
-                        <span id="loginBtnText">🚀 Login to Dashboard</span>
+                        🚀 Login to Dashboard
                     </button>
                 </form>
+
+                <div class="debug-info" id="debugInfo"></div>
             </div>
 
             <div class="login-footer">
-                <p>Protected access. Contact administrator if you forgot the password.</p>
+                <p>Default password: <strong>admin123</strong></p>
+                <p style="margin-top: 8px;">Contact administrator if you forgot the password.</p>
             </div>
         </div>
     </div>
 
-    <script src="js/config.js"></script>
     <script>
+        // =====================================================
+        // CONFIGURATION - UPDATE THIS URL!
+        // =====================================================
+        const API_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+        // Example: 'https://script.google.com/macros/s/AKfycbw.../exec'
+        
+        // =====================================================
         // Check if already logged in
+        // =====================================================
         document.addEventListener('DOMContentLoaded', function() {
             if (isLoggedIn()) {
                 window.location.href = 'index.html';
@@ -332,19 +282,16 @@
             try {
                 const sessionData = JSON.parse(session);
                 const now = new Date().getTime();
-                
-                if (sessionData.expiry && now < sessionData.expiry) {
-                    return true;
-                } else {
-                    localStorage.removeItem('atl_session');
-                    return false;
-                }
+                return sessionData.expiry && now < sessionData.expiry;
             } catch (e) {
                 localStorage.removeItem('atl_session');
                 return false;
             }
         }
 
+        // =====================================================
+        // Toggle Password Visibility
+        // =====================================================
         function togglePassword() {
             const input = document.getElementById('password');
             const btn = document.querySelector('.toggle-password');
@@ -358,62 +305,100 @@
             }
         }
 
-        function checkCapsLock(event) {
-            const capsWarning = document.getElementById('capsWarning');
-            if (event.getModifierState && event.getModifierState('CapsLock')) {
-                capsWarning.classList.add('show');
-            } else {
-                capsWarning.classList.remove('show');
-            }
-        }
-
+        // =====================================================
+        // Show/Hide Error
+        // =====================================================
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
-            const errorText = document.getElementById('errorText');
-            errorText.textContent = message;
+            errorDiv.textContent = '⚠️ ' + message;
             errorDiv.classList.add('show');
-            
-            // Shake animation
-            errorDiv.style.animation = 'none';
-            setTimeout(() => {
-                errorDiv.style.animation = 'shake 0.5s ease-in-out';
-            }, 10);
         }
 
         function hideError() {
             document.getElementById('errorMessage').classList.remove('show');
         }
 
+        function showDebug(info) {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.textContent = info;
+            debugDiv.classList.add('show');
+        }
+
+        // =====================================================
+        // Set Loading State
+        // =====================================================
         function setLoading(loading) {
             const btn = document.getElementById('loginBtn');
-            const btnText = document.getElementById('loginBtnText');
             
             if (loading) {
                 btn.disabled = true;
-                btnText.innerHTML = '<div class="spinner-small"></div> Verifying...';
+                btn.innerHTML = '<span class="spinner"></span> Verifying...';
             } else {
                 btn.disabled = false;
-                btnText.innerHTML = '🚀 Login to Dashboard';
+                btn.innerHTML = '🚀 Login to Dashboard';
             }
         }
 
+        // =====================================================
+        // Handle Login
+        // =====================================================
         async function handleLogin(event) {
             event.preventDefault();
             hideError();
             setLoading(true);
             
-            const password = document.getElementById('password').value;
+            const password = document.getElementById('password').value.trim();
             const rememberMe = document.getElementById('rememberMe').checked;
             
+            if (!password) {
+                showError('Please enter a password');
+                setLoading(false);
+                return;
+            }
+
+            // Check if API_URL is configured
+            if (API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE' || !API_URL) {
+                showError('API URL not configured! Please update the API_URL in login.html');
+                setLoading(false);
+                return;
+            }
+            
             try {
+                console.log('Attempting login...');
+                console.log('API URL:', API_URL);
+                
                 const url = new URL(API_URL);
                 url.searchParams.append('action', 'verifyPassword');
                 url.searchParams.append('password', password);
                 
-                const response = await fetch(url.toString());
-                const result = await response.json();
+                console.log('Request URL:', url.toString());
+                
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    redirect: 'follow'
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const text = await response.text();
+                console.log('Response text:', text);
+                
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    showError('Invalid response from server. Check console for details.');
+                    showDebug('Response: ' + text.substring(0, 200));
+                    setLoading(false);
+                    return;
+                }
+                
+                console.log('Parsed result:', result);
                 
                 if (result.success) {
+                    console.log('Login successful!');
+                    
                     // Calculate expiry
                     const now = new Date().getTime();
                     const expiry = rememberMe 
@@ -432,32 +417,23 @@
                     // Redirect to dashboard
                     window.location.href = 'index.html';
                 } else {
+                    console.log('Login failed:', result.error);
                     showError(result.error || 'Invalid password. Please try again.');
                     document.getElementById('password').select();
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showError('Connection error. Please check your internet and try again.');
+                showError('Connection error: ' + error.message);
+                showDebug('Error details: ' + error.toString());
             }
             
             setLoading(false);
         }
 
-        // Add shake animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-                20%, 40%, 60%, 80% { transform: translateX(5px); }
-            }
-        `;
-        document.head.appendChild(style);
-
         // Enter key support
         document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+                handleLogin(e);
             }
         });
     </script>
