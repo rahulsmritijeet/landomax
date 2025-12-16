@@ -85,46 +85,283 @@ function escapeHtml(text) {
 }
 
 // =====================================================
-// PROJECTS MODULE
+// PROJECTS MODULE (Complete with Team Members)
 // =====================================================
 
+let allProjects = [];
+let allProjectComponents = [];
+let currentTypeFilter = 'all';
+let teamMembersList = [];
+let allPreviousStudents = new Set();
+
+// Load Projects List
 async function loadProjects() {
     showLoading();
     try {
         const result = await apiCall('getProjects');
-        const tbody = document.getElementById('projectsTableBody');
-        tbody.innerHTML = '';
+        allProjects = result.data || [];
         
-        if (result.data && result.data.length > 0) {
-            result.data.forEach(project => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${project.ProjectID}</td>
-                    <td><strong>${project.ProjectName}</strong></td>
-                    <td>${project.Overview ? project.Overview.substring(0, 50) + '...' : '-'}</td>
-                    <td>${project.ComponentsUsed || '-'}</td>
-                    <td>${formatDate(project.LastUpdated)}</td>
-                    <td class="actions">
-                        <button class="btn btn-sm btn-primary" onclick="editProject('${project.ProjectID}')">✏️ Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteProject('${project.ProjectID}')">🗑️ Delete</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No projects found</td></tr>';
-        }
+        updateProjectStats();
+        renderProjectsList(allProjects);
+        collectPreviousStudents();
     } catch (error) {
         console.error('Error loading projects:', error);
+        document.getElementById('projectsContainer').innerHTML = `
+            <div class="error-state">
+                <p>❌ Failed to load projects. Please refresh the page.</p>
+            </div>
+        `;
     }
     hideLoading();
 }
+
+function collectPreviousStudents() {
+    allPreviousStudents.clear();
+    allProjects.forEach(project => {
+        if (project.TeamMembers) {
+            const members = project.TeamMembers.split(',').map(m => m.trim()).filter(m => m);
+            members.forEach(m => allPreviousStudents.add(m));
+        }
+    });
+}
+
+function updateProjectStats() {
+    const totalProjects = allProjects.length;
+    
+    // Count unique students
+    const allStudents = new Set();
+    allProjects.forEach(project => {
+        if (project.TeamMembers) {
+            const members = project.TeamMembers.split(',').map(m => m.trim()).filter(m => m);
+            members.forEach(m => allStudents.add(m.toLowerCase()));
+        }
+    });
+    
+    // Count unique components
+    const allComponents = new Set();
+    allProjects.forEach(project => {
+        if (project.ComponentsUsed) {
+            const components = project.ComponentsUsed.split(',').map(c => c.trim()).filter(c => c);
+            components.forEach(c => allComponents.add(c));
+        }
+    });
+    
+    const totalProjectsEl = document.getElementById('totalProjects');
+    const totalStudentsEl = document.getElementById('totalStudents');
+    const totalComponentsEl = document.getElementById('totalComponentsUsed');
+    
+    if (totalProjectsEl) totalProjectsEl.textContent = totalProjects;
+    if (totalStudentsEl) totalStudentsEl.textContent = allStudents.size;
+    if (totalComponentsEl) totalComponentsEl.textContent = allComponents.size;
+}
+
+function renderProjectsList(projects) {
+    const container = document.getElementById('projectsContainer');
+    
+    if (!projects || projects.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <h3>No Projects Found</h3>
+                <p>Create your first project to get started!</p>
+                <a href="project_form.html" class="btn btn-primary">➕ Create Project</a>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = projects.map(project => createProjectCard(project)).join('');
+}
+
+function createProjectCard(project) {
+    const teamMembers = project.TeamMembers ? 
+        project.TeamMembers.split(',').map(m => m.trim()).filter(m => m) : [];
+    
+    const components = project.ComponentsUsed ? 
+        project.ComponentsUsed.split(',').map(c => c.trim()).filter(c => c) : [];
+    
+    const teamMembersHtml = teamMembers.length > 0 ? `
+        <div class="project-team">
+            <span class="team-label">👥 Team:</span>
+            <div class="team-avatars">
+                ${teamMembers.slice(0, 5).map(member => `
+                    <span class="team-avatar" title="${escapeHtml(member)}">${getInitials(member)}</span>
+                `).join('')}
+                ${teamMembers.length > 5 ? `<span class="team-more">+${teamMembers.length - 5}</span>` : ''}
+            </div>
+            <span class="team-names">${teamMembers.join(', ')}</span>
+        </div>
+    ` : `
+        <div class="project-team no-team">
+            <span class="team-label">👥 Team:</span>
+            <span class="no-team-text">No team members assigned</span>
+        </div>
+    `;
+    
+    const componentsHtml = components.length > 0 ? `
+        <div class="project-components">
+            <span class="components-label">⚙️ Components:</span>
+            <div class="component-tags">
+                ${components.slice(0, 4).map(comp => `
+                    <span class="component-tag">${comp}</span>
+                `).join('')}
+                ${components.length > 4 ? `<span class="component-tag more">+${components.length - 4} more</span>` : ''}
+            </div>
+        </div>
+    ` : '';
+    
+    return `
+        <div class="project-card" onclick="viewProject('${project.ProjectID}')">
+            <div class="project-card-header">
+                <div class="project-id"><code>${project.ProjectID}</code></div>
+                <div class="project-date">${formatDate(project.LastUpdated)}</div>
+            </div>
+            
+            <h3 class="project-title">${escapeHtml(project.ProjectName) || 'Untitled Project'}</h3>
+            
+            ${project.Overview ? `
+                <p class="project-overview">${escapeHtml(project.Overview).substring(0, 150)}${project.Overview.length > 150 ? '...' : ''}</p>
+            ` : ''}
+            
+            ${teamMembersHtml}
+            
+            ${componentsHtml}
+            
+            <div class="project-card-actions" onclick="event.stopPropagation()">
+                <button class="btn btn-sm btn-primary" onclick="editProject('${project.ProjectID}')">
+                    ✏️ Edit
+                </button>
+                <button class="btn btn-sm btn-info" onclick="viewProject('${project.ProjectID}')">
+                    👁️ View
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteProject('${project.ProjectID}')">
+                    🗑️ Delete
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+}
+
+function searchProjects() {
+    const query = document.getElementById('searchProjects').value.toLowerCase().trim();
+    
+    if (!query) {
+        renderProjectsList(allProjects);
+        return;
+    }
+    
+    const filtered = allProjects.filter(project => {
+        const name = (project.ProjectName || '').toLowerCase();
+        const overview = (project.Overview || '').toLowerCase();
+        const team = (project.TeamMembers || '').toLowerCase();
+        const components = (project.ComponentsUsed || '').toLowerCase();
+        const id = (project.ProjectID || '').toLowerCase();
+        
+        return name.includes(query) || 
+               overview.includes(query) || 
+               team.includes(query) || 
+               components.includes(query) ||
+               id.includes(query);
+    });
+    
+    renderProjectsList(filtered);
+}
+
+function viewProject(projectId) {
+    const project = allProjects.find(p => p.ProjectID === projectId);
+    if (!project) return;
+    
+    const teamMembers = project.TeamMembers ? 
+        project.TeamMembers.split(',').map(m => m.trim()).filter(m => m) : [];
+    
+    const components = project.ComponentsUsed ? 
+        project.ComponentsUsed.split(',').map(c => c.trim()).filter(c => c) : [];
+    
+    document.getElementById('modalProjectName').textContent = project.ProjectName || 'Untitled Project';
+    
+    document.getElementById('modalProjectBody').innerHTML = `
+        <div class="project-detail">
+            <div class="detail-section">
+                <h4>📋 Overview</h4>
+                <p>${project.Overview ? escapeHtml(project.Overview) : '<em>No overview provided</em>'}</p>
+            </div>
+            
+            <div class="detail-section">
+                <h4>👥 Team Members</h4>
+                ${teamMembers.length > 0 ? `
+                    <div class="team-list-detailed">
+                        ${teamMembers.map(member => `
+                            <div class="team-member-item">
+                                <span class="team-avatar large">${getInitials(member)}</span>
+                                <span class="team-member-name">${escapeHtml(member)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p><em>No team members assigned</em></p>'}
+            </div>
+            
+            <div class="detail-section">
+                <h4>⚙️ Components Used</h4>
+                ${components.length > 0 ? `
+                    <div class="components-list-detailed">
+                        ${components.map(comp => `
+                            <span class="component-tag">${comp}</span>
+                        `).join('')}
+                    </div>
+                ` : '<p><em>No components listed</em></p>'}
+            </div>
+            
+            ${project.Code ? `
+                <div class="detail-section">
+                    <h4>💻 Code / Notes</h4>
+                    <pre class="code-block">${escapeHtml(project.Code)}</pre>
+                </div>
+            ` : ''}
+            
+            <div class="detail-section">
+                <h4>📅 Last Updated</h4>
+                <p>${formatDate(project.LastUpdated)}</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('modalEditBtn').onclick = function() {
+        window.location.href = `project_form.html?id=${projectId}`;
+    };
+    
+    document.getElementById('projectModal').classList.add('show');
+}
+
+function closeProjectModal() {
+    document.getElementById('projectModal').classList.remove('show');
+}
+
+// =====================================================
+// Project Form Functions
+// =====================================================
 
 async function loadProjectForm() {
     const projectId = getUrlParam('id');
     const formTitle = document.getElementById('formTitle');
     
+    // Load previous students for quick add
+    await loadPreviousStudents();
+    
+    // Load components with enhanced UI
     await loadComponentsMultiSelect();
+    
+    // Initialize team members list
+    teamMembersList = [];
+    renderTeamMembersChips();
     
     if (projectId) {
         formTitle.textContent = 'Edit Project';
@@ -137,11 +374,22 @@ async function loadProjectForm() {
                 document.getElementById('overview').value = result.data.Overview || '';
                 document.getElementById('code').value = result.data.Code || '';
                 
+                // Load team members
+                if (result.data.TeamMembers) {
+                    teamMembersList = result.data.TeamMembers.split(',').map(m => m.trim()).filter(m => m);
+                    renderTeamMembersChips();
+                }
+                
+                // Set selected components
                 if (result.data.ComponentsUsed) {
                     const selectedComponents = result.data.ComponentsUsed.split(',').map(c => c.trim());
                     document.querySelectorAll('#componentsUsed input[type="checkbox"]').forEach(cb => {
-                        if (selectedComponents.includes(cb.value)) cb.checked = true;
+                        if (selectedComponents.includes(cb.value)) {
+                            cb.checked = true;
+                        }
                     });
+                    updateSelectedCount();
+                    updateSelectedPreview();
                 }
             }
         } catch (error) {
@@ -153,39 +401,327 @@ async function loadProjectForm() {
     }
 }
 
+async function loadPreviousStudents() {
+    try {
+        const result = await apiCall('getProjects');
+        const projects = result.data || [];
+        
+        const students = new Set();
+        projects.forEach(project => {
+            if (project.TeamMembers) {
+                const members = project.TeamMembers.split(',').map(m => m.trim()).filter(m => m);
+                members.forEach(m => students.add(m));
+            }
+        });
+        
+        const container = document.getElementById('previousStudents');
+        if (container && students.size > 0) {
+            const studentsArray = Array.from(students).sort();
+            container.innerHTML = studentsArray.slice(0, 15).map(student => `
+                <button type="button" class="quick-add-chip" onclick="quickAddTeamMember('${escapeHtml(student)}')">
+                    ➕ ${escapeHtml(student)}
+                </button>
+            `).join('');
+            
+            if (studentsArray.length > 15) {
+                container.innerHTML += `<span class="more-items">+${studentsArray.length - 15} more</span>`;
+            }
+        } else if (container) {
+            container.innerHTML = '<span class="no-previous">No previous students found</span>';
+        }
+    } catch (error) {
+        console.error('Error loading previous students:', error);
+    }
+}
+
+// Team Members Functions
+function handleTeamMemberKeydown(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addTeamMember();
+    }
+}
+
+function addTeamMember() {
+    const input = document.getElementById('teamMemberInput');
+    const name = input.value.trim();
+    
+    if (name && !teamMembersList.includes(name)) {
+        teamMembersList.push(name);
+        renderTeamMembersChips();
+        input.value = '';
+        input.focus();
+    } else if (teamMembersList.includes(name)) {
+        showNotification('This team member is already added', 'error');
+    }
+}
+
+function quickAddTeamMember(name) {
+    if (!teamMembersList.includes(name)) {
+        teamMembersList.push(name);
+        renderTeamMembersChips();
+        showNotification(`Added ${name} to team`);
+    } else {
+        showNotification(`${name} is already in the team`, 'error');
+    }
+}
+
+function removeTeamMember(index) {
+    const removed = teamMembersList.splice(index, 1)[0];
+    renderTeamMembersChips();
+    showNotification(`Removed ${removed} from team`);
+}
+
+function renderTeamMembersChips() {
+    const container = document.getElementById('teamMembersChips');
+    const hiddenInput = document.getElementById('teamMembers');
+    
+    if (teamMembersList.length === 0) {
+        container.innerHTML = '';
+    } else {
+        container.innerHTML = teamMembersList.map((member, index) => `
+            <span class="team-member-chip">
+                <span class="chip-avatar">${getInitials(member)}</span>
+                ${escapeHtml(member)}
+                <button type="button" class="chip-remove" onclick="removeTeamMember(${index})" title="Remove">✕</button>
+            </span>
+        `).join('');
+    }
+    
+    // Update hidden input
+    hiddenInput.value = teamMembersList.join(', ');
+}
+
+// Components Multi-Select Functions (same as before)
 async function loadComponentsMultiSelect() {
     try {
         const result = await apiCall('getComponents');
         const container = document.getElementById('componentsUsed');
+        allProjectComponents = result.data || [];
         
-        if (result.data && result.data.length > 0) {
-            container.innerHTML = result.data.map(comp => `
-                <label class="checkbox-label">
-                    <input type="checkbox" name="components" value="${comp.ComponentID}">
-                    ${comp.ComponentID} - ${comp.ComponentName} (Qty: ${comp.Quantity || 0})
-                </label>
-            `).join('');
-        } else {
-            container.innerHTML = '<p class="no-data">No components available</p>';
-        }
+        renderComponentsList(allProjectComponents);
+        updateResultsCount(allProjectComponents.length, allProjectComponents.length);
+        
     } catch (error) {
         console.error('Error loading components:', error);
+        document.getElementById('componentsUsed').innerHTML = 
+            '<p class="error-message">Failed to load components. Please refresh.</p>';
     }
 }
 
+function renderComponentsList(components, preserveSelections = true) {
+    const container = document.getElementById('componentsUsed');
+    
+    let selectedIds = [];
+    if (preserveSelections) {
+        document.querySelectorAll('#componentsUsed input[type="checkbox"]:checked').forEach(cb => {
+            selectedIds.push(cb.value);
+        });
+    }
+    
+    if (components && components.length > 0) {
+        container.innerHTML = components.map(comp => {
+            const isChecked = selectedIds.includes(comp.ComponentID) ? 'checked' : '';
+            const quantity = parseInt(comp.Quantity) || 0;
+            const qtyClass = quantity === 0 ? 'qty-zero' : quantity <= 5 ? 'qty-low' : 'qty-ok';
+            const typeIcon = getTypeIcon(comp.Type);
+            
+            return `
+                <label class="checkbox-label-enhanced" data-type="${(comp.Type || 'other').toLowerCase()}" data-name="${(comp.ComponentName || '').toLowerCase()}" data-id="${comp.ComponentID.toLowerCase()}">
+                    <input type="checkbox" name="components" value="${comp.ComponentID}" ${isChecked} onchange="updateSelectedCount(); updateSelectedPreview();">
+                    <span class="component-checkbox-content">
+                        <span class="component-main">
+                            <span class="component-icon">${typeIcon}</span>
+                            <span class="component-details">
+                                <span class="component-name">${comp.ComponentName}</span>
+                                <span class="component-meta">
+                                    <code>${comp.ComponentID}</code>
+                                    <span class="component-type-badge">${comp.Type || 'Other'}</span>
+                                </span>
+                            </span>
+                        </span>
+                        <span class="component-qty ${qtyClass}">${quantity} in stock</span>
+                    </span>
+                </label>
+            `;
+        }).join('');
+    } else {
+        container.innerHTML = '<p class="no-data">No components found matching your search.</p>';
+    }
+}
+
+function getTypeIcon(type) {
+    const icons = {
+        'microcontroller': '🎛️',
+        'sensor': '📡',
+        'motor': '⚙️',
+        'led': '💡',
+        'resistor': '🔧',
+        'capacitor': '🔋',
+        'wire': '🔌',
+        'connector': '🔗',
+        'display': '📺',
+        'power supply': '🔌',
+        'battery': '🔋',
+        'module': '📦',
+        'board': '🎚️',
+        'tool': '🛠️'
+    };
+    return icons[(type || '').toLowerCase()] || '📦';
+}
+
+function searchComponentsInForm(query) {
+    const searchTerm = query.toLowerCase().trim();
+    const labels = document.querySelectorAll('#componentsUsed .checkbox-label-enhanced');
+    let visibleCount = 0;
+    
+    labels.forEach(label => {
+        const name = label.dataset.name || '';
+        const type = label.dataset.type || '';
+        const id = label.dataset.id || '';
+        
+        const matchesSearch = !searchTerm || 
+            name.includes(searchTerm) || 
+            type.includes(searchTerm) || 
+            id.includes(searchTerm);
+        
+        const matchesType = currentTypeFilter === 'all' || 
+            (currentTypeFilter === 'other' && !['microcontroller', 'sensor', 'motor', 'led', 'module', 'wire'].includes(type)) ||
+            type === currentTypeFilter.toLowerCase();
+        
+        if (matchesSearch && matchesType) {
+            label.style.display = 'flex';
+            visibleCount++;
+        } else {
+            label.style.display = 'none';
+        }
+    });
+    
+    updateResultsCount(visibleCount, allProjectComponents.length);
+    
+    const clearBtn = document.querySelector('.clear-search-btn');
+    if (clearBtn) {
+        clearBtn.style.display = searchTerm ? 'flex' : 'none';
+    }
+}
+
+function clearComponentSearch() {
+    const searchInput = document.getElementById('componentSearch');
+    searchInput.value = '';
+    searchComponentsInForm('');
+    searchInput.focus();
+}
+
+function filterByType(type) {
+    currentTypeFilter = type;
+    
+    document.querySelectorAll('.quick-filters .filter-chip').forEach(chip => {
+        chip.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    const searchTerm = document.getElementById('componentSearch').value;
+    searchComponentsInForm(searchTerm);
+}
+
+function selectAllVisible() {
+    const visibleLabels = document.querySelectorAll('#componentsUsed .checkbox-label-enhanced');
+    let count = 0;
+    
+    visibleLabels.forEach(label => {
+        if (label.style.display !== 'none') {
+            const checkbox = label.querySelector('input[type="checkbox"]');
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                count++;
+            }
+        }
+    });
+    
+    updateSelectedCount();
+    updateSelectedPreview();
+    showNotification(`Selected ${count} components`);
+}
+
+function deselectAll() {
+    document.querySelectorAll('#componentsUsed input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    updateSelectedCount();
+    updateSelectedPreview();
+    showNotification('All components deselected');
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('#componentsUsed input[type="checkbox"]:checked').length;
+    const countEl = document.getElementById('selectedCount');
+    if (countEl) {
+        countEl.textContent = `(${selected} selected)`;
+        countEl.className = selected > 0 ? 'selected-count has-selection' : 'selected-count';
+    }
+}
+
+function updateResultsCount(visible, total) {
+    const countEl = document.getElementById('resultsCount');
+    if (countEl) {
+        if (visible === total) {
+            countEl.textContent = `${total} components`;
+        } else {
+            countEl.textContent = `${visible} of ${total} components`;
+        }
+    }
+}
+
+function updateSelectedPreview() {
+    const selectedCheckboxes = document.querySelectorAll('#componentsUsed input[type="checkbox"]:checked');
+    const previewContainer = document.getElementById('selectedChips');
+    
+    if (selectedCheckboxes.length === 0) {
+        previewContainer.innerHTML = '<span class="no-selection">No components selected</span>';
+        return;
+    }
+    
+    let chipsHtml = '';
+    selectedCheckboxes.forEach(cb => {
+        const label = cb.closest('.checkbox-label-enhanced');
+        const name = label.querySelector('.component-name').textContent;
+        const id = cb.value;
+        
+        chipsHtml += `
+            <span class="selected-chip">
+                ${name}
+                <button type="button" class="chip-remove" onclick="removeComponent('${id}')" title="Remove">✕</button>
+            </span>
+        `;
+    });
+    
+    previewContainer.innerHTML = chipsHtml;
+}
+
+function removeComponent(componentId) {
+    const checkbox = document.querySelector(`#componentsUsed input[value="${componentId}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+        updateSelectedCount();
+        updateSelectedPreview();
+    }
+}
+
+// Save Project
 async function saveProject(event) {
     event.preventDefault();
     showLoading();
     
     const projectId = document.getElementById('projectId').value;
-    const selectedComponents = Array.from(document.querySelectorAll('#componentsUsed input:checked'))
+    const selectedComponents = Array.from(document.querySelectorAll('#componentsUsed input[type="checkbox"]:checked'))
         .map(cb => cb.value).join(', ');
     
     const projectData = {
         ProjectName: document.getElementById('projectName').value,
         Overview: document.getElementById('overview').value,
         Code: document.getElementById('code').value,
-        ComponentsUsed: selectedComponents
+        ComponentsUsed: selectedComponents,
+        TeamMembers: teamMembersList.join(', ')
     };
     
     try {
@@ -208,7 +744,7 @@ function editProject(id) {
 }
 
 async function deleteProject(id) {
-    if (confirm('Are you sure you want to delete this project?')) {
+    if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
         showLoading();
         try {
             await apiCall('deleteProject', { id: id });
