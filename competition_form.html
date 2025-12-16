@@ -138,8 +138,18 @@
 
     <script src="js/config.js"></script>
     <script src="js/script.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', loadCompetitionForm);
+
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            updateSessionInfo();
+        });
+
     </script>
 </body>
 </html>
+
