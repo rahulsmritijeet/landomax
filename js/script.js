@@ -3,7 +3,7 @@
 // =====================================================
 
 // ⚠️ REPLACE THIS WITH YOUR ACTUAL SPREADSHEET ID
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
+const SPREADSHEET_ID = 'https://script.google.com/macros/s/AKfycbzHxXCYWTSP5IzF8uJLTjwnwRF-C_-DSd8b7K5idQsS6_18pnXeA8xtSzsV-MsCLcEP/exec';
 
 // Sheet names
 const SHEETS = {
