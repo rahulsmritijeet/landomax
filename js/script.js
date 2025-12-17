@@ -1,6 +1,6 @@
 // =====================================================
 // script.js - ATL Dashboard Complete
-// ALL MODULES INCLUDED
+// With Stock Validation, Excel Export/Import, Smart Matching
 // =====================================================
 
 // =====================================================
@@ -9,30 +9,50 @@
 
 async function apiCall(action, params = {}) {
     try {
+        if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) console.log('📡 API Call:', action, params);
+        
         const url = new URL(API_URL);
         url.searchParams.append('action', action);
         
         for (const [key, value] of Object.entries(params)) {
-            url.searchParams.append(key, typeof value === 'object' ? JSON.stringify(value) : value);
+            if (typeof value === 'object') {
+                url.searchParams.append(key, JSON.stringify(value));
+            } else {
+                url.searchParams.append(key, value);
+            }
         }
         
         const response = await fetch(url.toString());
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
         const text = await response.text();
-        const result = JSON.parse(text);
         
-        if (!result.success && result.error) throw new Error(result.error);
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error('❌ JSON Parse Error:', e);
+            throw new Error('Invalid JSON response from server');
+        }
+        
+        if (!result.success && result.error) {
+            throw new Error(result.error);
+        }
+        
         return result;
+        
     } catch (error) {
-        console.error('API Error:', error);
+        console.error('❌ API Error:', error);
         showNotification('Error: ' + error.message, 'error');
         throw error;
     }
 }
 
 // =====================================================
-// UI HELPERS
+// UI HELPER FUNCTIONS
 // =====================================================
 
 function showLoading() {
@@ -47,13 +67,22 @@ function hideLoading() {
 
 function showNotification(message, type = 'success') {
     document.querySelectorAll('.notification').forEach(n => n.remove());
+    
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
+    
     const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌';
-    notification.innerHTML = `<span>${icon} ${message}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;margin-left:10px;">✕</button>`;
+    notification.innerHTML = `
+        <span>${icon} ${message}</span>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;margin-left:10px;">✕</button>
+    `;
     document.body.appendChild(notification);
+    
     setTimeout(() => notification.classList.add('show'), 10);
-    setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 300); }, 5000);
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
 }
 
 function formatDate(dateStr) {
@@ -63,8 +92,8 @@ function formatDate(dateStr) {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function getUrlParam(param) { 
-    return new URLSearchParams(window.location.search).get(param); 
+function getUrlParam(param) {
+    return new URLSearchParams(window.location.search).get(param);
 }
 
 function escapeHtml(text) {
@@ -77,16 +106,17 @@ function escapeHtml(text) {
 function getInitials(name) {
     if (!name) return '?';
     const parts = name.trim().split(' ');
-    return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name.substring(0,2).toUpperCase();
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
 }
 
 function getTypeIcon(type) {
-    const icons = { 
-        'microcontroller':'🎛️', 'sensor':'📡', 'motor':'⚙️', 'led':'💡',
-        'resistor':'🔧', 'capacitor':'🔋', 'wire':'🔌', 'display':'📺',
-        'module':'📦', 'board':'🎚️', 'battery':'🔋', 'switch':'🔘'
+    const icons = {
+        'microcontroller': '🎛️', 'sensor': '📡', 'motor': '⚙️', 'led': '💡',
+        'resistor': '🔧', 'capacitor': '🔋', 'wire': '🔌', 'display': '📺',
+        'module': '📦', 'board': '🎚️', 'battery': '🔋', 'switch': '🔘'
     };
-    return icons[(type||'').toLowerCase()] || '📦';
+    return icons[(type || '').toLowerCase()] || '📦';
 }
 
 // =====================================================
@@ -106,12 +136,11 @@ async function loadProjects() {
         allProjects = result.data || [];
         updateProjectStats();
         renderProjectsList(allProjects);
-    } catch (e) { 
-        console.error(e);
-        const container = document.getElementById('projectsContainer');
-        if (container) {
-            container.innerHTML = `<div class="empty-state"><h3>Failed to load projects</h3><button onclick="loadProjects()" class="btn btn-primary">🔄 Retry</button></div>`;
-        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        document.getElementById('projectsContainer').innerHTML = `
+            <div class="empty-state"><h3>Failed to load projects</h3>
+            <button onclick="loadProjects()" class="btn btn-primary">🔄 Retry</button></div>`;
     }
     hideLoading();
 }
@@ -199,19 +228,14 @@ function viewProject(projectId) {
             <div class="detail-section"><h4>📋 Overview</h4><p>${escapeHtml(project.Overview) || 'No overview'}</p></div>
             <div class="detail-section"><h4>👥 Team</h4><p>${escapeHtml(project.TeamMembers) || 'No team members'}</p></div>
             <div class="detail-section"><h4>⚙️ Components</h4><p>${escapeHtml(project.ComponentsUsed) || 'No components'}</p></div>
-            ${project.Code ? `<div class="detail-section"><h4>💻 Code</h4><pre class="code-block">${escapeHtml(project.Code)}</pre></div>` : ''}
+            ${project.Code ? `<div class="detail-section"><h4>💻 Code</h4><pre>${escapeHtml(project.Code)}</pre></div>` : ''}
         </div>`;
     document.getElementById('modalEditBtn').onclick = () => window.location.href = `project_form.html?id=${projectId}`;
     document.getElementById('projectModal').classList.add('show');
 }
 
-function closeProjectModal() { 
-    document.getElementById('projectModal').classList.remove('show'); 
-}
-
-function editProject(id) { 
-    window.location.href = `project_form.html?id=${id}`; 
-}
+function closeProjectModal() { document.getElementById('projectModal').classList.remove('show'); }
+function editProject(id) { window.location.href = `project_form.html?id=${id}`; }
 
 async function deleteProject(id) {
     if (!confirm('Delete this project?')) return;
@@ -273,8 +297,7 @@ async function loadComponentsForSelection() {
         allProjectComponents = result.data || [];
         renderAvailableComponents(allProjectComponents);
     } catch (e) {
-        const container = document.getElementById('availableComponentsList');
-        if (container) container.innerHTML = '<div class="error-message">Failed to load components</div>';
+        document.getElementById('availableComponentsList').innerHTML = '<div class="error-message">Failed to load</div>';
     }
 }
 
@@ -283,7 +306,7 @@ function renderAvailableComponents(components) {
     if (!container) return;
     
     if (!components?.length) {
-        container.innerHTML = '<div class="no-data">No components available</div>';
+        container.innerHTML = '<div class="no-data">No components</div>';
         return;
     }
     
@@ -301,19 +324,17 @@ function renderAvailableComponents(components) {
                 <div class="component-item-main">
                     <span class="component-icon">${getTypeIcon(comp.Type)}</span>
                     <div class="component-info">
-                        <span class="component-name">${escapeHtml(comp.ComponentName)}</span>
-                        <span class="component-meta"><code>${comp.ComponentID}</code> <span class="type-badge">${comp.Type || 'Other'}</span></span>
+                        <span class="component-name">${comp.ComponentName}</span>
+                        <span class="component-meta"><code>${comp.ComponentID}</code></span>
                     </div>
                 </div>
-                <div class="component-stock ${qtyClass}">${outOfStock ? '❌ Out' : stock + ' available'}</div>
+                <div class="component-stock ${qtyClass}">${outOfStock ? '❌ Out' : stock + ' in stock'}</div>
                 <div class="component-add-btn ${outOfStock ? 'disabled' : ''}">${outOfStock ? '🚫' : isSelected ? '✓' : '+'}</div>
             </div>`;
     }).join('');
 }
 
-function showOutOfStockWarning() { 
-    showNotification('Component is out of stock!', 'warning'); 
-}
+function showOutOfStockWarning() { showNotification('Component is out of stock!', 'warning'); }
 
 function toggleComponent(componentId) {
     const comp = allProjectComponents.find(c => c.ComponentID === componentId);
@@ -340,8 +361,7 @@ function renderSelectedComponents() {
     const keys = Object.keys(selectedProjectComponents);
     if (!keys.length) {
         container.innerHTML = '<div class="no-selection-message">👈 Click components to add</div>';
-        const totalEl = document.getElementById('selectedTotal');
-        if (totalEl) totalEl.textContent = '(0)';
+        if (document.getElementById('selectedTotal')) document.getElementById('selectedTotal').textContent = '(0)';
         return;
     }
     
@@ -358,7 +378,7 @@ function renderSelectedComponents() {
                 <div class="selected-component-info">
                     <span class="component-icon">${getTypeIcon(comp.Type)}</span>
                     <div>
-                        <div class="component-name">${escapeHtml(comp.ComponentName)}</div>
+                        <div class="component-name">${comp.ComponentName}</div>
                         <code>${comp.ComponentID}</code>
                         <span class="stock-info ${over ? 'over-stock' : ''}">(${stock} available)</span>
                         ${over ? '<span class="warning-badge">⚠️ Exceeds!</span>' : ''}
@@ -373,8 +393,7 @@ function renderSelectedComponents() {
             </div>`;
     }).join('');
     
-    const totalEl = document.getElementById('selectedTotal');
-    if (totalEl) totalEl.textContent = `(${total} total)`;
+    if (document.getElementById('selectedTotal')) document.getElementById('selectedTotal').textContent = `(${total} total)`;
 }
 
 function changeComponentQty(id, delta) {
@@ -398,10 +417,7 @@ function setComponentQty(id, value) {
     const stock = parseInt(selectedProjectComponents[id].Quantity) || 0;
     let qty = parseInt(value) || 1;
     if (qty < 1) qty = 1;
-    if (qty > stock) { 
-        showNotification(`Only ${stock} available!`, 'warning'); 
-        qty = stock; 
-    }
+    if (qty > stock) { showNotification(`Only ${stock} available!`, 'warning'); qty = stock; }
     selectedProjectComponents[id].selectedQuantity = qty;
     renderSelectedComponents();
 }
@@ -455,17 +471,13 @@ async function loadPreviousStudents() {
         const container = document.getElementById('previousStudents');
         if (container && students.size) {
             container.innerHTML = Array.from(students).sort().slice(0, 10).map(s => 
-                `<button type="button" class="quick-add-chip" onclick="quickAddTeamMember('${escapeHtml(s).replace(/'/g, "\\'")}')"}>➕ ${escapeHtml(s)}</button>`
+                `<button type="button" class="quick-add-chip" onclick="quickAddTeamMember('${escapeHtml(s)}')">➕ ${escapeHtml(s)}</button>`
             ).join('');
-        } else if (container) {
-            container.innerHTML = '<span class="no-previous">No previous students</span>';
         }
     } catch (e) { console.error(e); }
 }
 
-function handleTeamMemberKeydown(e) { 
-    if (e.key === 'Enter') { e.preventDefault(); addTeamMember(); } 
-}
+function handleTeamMemberKeydown(e) { if (e.key === 'Enter') { e.preventDefault(); addTeamMember(); } }
 
 function addTeamMember() {
     const input = document.getElementById('teamMemberInput');
@@ -485,10 +497,7 @@ function quickAddTeamMember(name) {
     }
 }
 
-function removeTeamMember(index) { 
-    teamMembersList.splice(index, 1); 
-    renderTeamMembersChips(); 
-}
+function removeTeamMember(index) { teamMembersList.splice(index, 1); renderTeamMembersChips(); }
 
 function renderTeamMembersChips() {
     const container = document.getElementById('teamMembersChips');
@@ -551,7 +560,6 @@ async function saveProject(event) {
 let allComponents = [];
 let currentStockFilter = 'all';
 let importData = [];
-let currentQuantityComponentId = null;
 
 async function loadComponents() {
     showLoading();
@@ -566,9 +574,9 @@ async function loadComponents() {
 
 function updateComponentStats() {
     const total = allComponents.length;
-    const inStock = allComponents.filter(c => (parseInt(c.Quantity)||0) > 5).length;
-    const lowStock = allComponents.filter(c => { const q = parseInt(c.Quantity)||0; return q > 0 && q <= 5; }).length;
-    const outOfStock = allComponents.filter(c => (parseInt(c.Quantity)||0) === 0).length;
+    const inStock = allComponents.filter(c => (parseInt(c.Quantity) || 0) > 5).length;
+    const lowStock = allComponents.filter(c => { const q = parseInt(c.Quantity) || 0; return q > 0 && q <= 5; }).length;
+    const outOfStock = allComponents.filter(c => (parseInt(c.Quantity) || 0) === 0).length;
     
     if (document.getElementById('totalComponents')) document.getElementById('totalComponents').textContent = total;
     if (document.getElementById('inStockCount')) document.getElementById('inStockCount').textContent = inStock;
@@ -581,20 +589,19 @@ function renderComponentsTable(components) {
     if (!tbody) return;
     
     if (!components?.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No components found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No components</td></tr>';
         return;
     }
     
     tbody.innerHTML = components.map(c => {
         const qty = parseInt(c.Quantity) || 0;
         const cls = qty === 0 ? 'qty-zero' : qty <= 5 ? 'qty-low' : 'qty-ok';
-        const safeName = escapeHtml(c.ComponentName).replace(/'/g, "\\'");
         return `<tr>
             <td><code>${c.ComponentID}</code></td>
-            <td><span class="type-icon">${getTypeIcon(c.Type)}</span> <strong>${escapeHtml(c.ComponentName)}</strong></td>
+            <td><span class="type-icon">${getTypeIcon(c.Type)}</span> <strong>${c.ComponentName}</strong></td>
             <td><span class="type-badge">${c.Type || '-'}</span></td>
-            <td>${escapeHtml((c.Description||'').substring(0,40))}${(c.Description||'').length > 40 ? '...' : ''}</td>
-            <td><span class="quantity-badge ${cls}" onclick="openQuantityModal('${c.ComponentID}','${safeName}',${qty})">${qty} ✏️</span></td>
+            <td>${(c.Description || '').substring(0, 40)}${(c.Description || '').length > 40 ? '...' : ''}</td>
+            <td><span class="quantity-badge ${cls}" onclick="openQuantityModal('${c.ComponentID}','${escapeHtml(c.ComponentName)}',${qty})">${qty} ✏️</span></td>
             <td><button class="btn btn-sm btn-primary" onclick="editComponent('${c.ComponentID}')">✏️</button></td>
         </tr>`;
     }).join('');
@@ -603,24 +610,24 @@ function renderComponentsTable(components) {
 function searchComponents() {
     const q = (document.getElementById('searchComponents')?.value || '').toLowerCase();
     let filtered = allComponents.filter(c => 
-        (c.ComponentName||'').toLowerCase().includes(q) || 
-        (c.ComponentID||'').toLowerCase().includes(q) || 
-        (c.Type||'').toLowerCase().includes(q)
+        (c.ComponentName || '').toLowerCase().includes(q) ||
+        (c.ComponentID || '').toLowerCase().includes(q) ||
+        (c.Type || '').toLowerCase().includes(q)
     );
     if (currentStockFilter !== 'all') filtered = applyStockFilter(filtered, currentStockFilter);
     renderComponentsTable(filtered);
 }
 
-function filterComponentsByStock(filter, btn) {
+function filterComponentsByStock(filter) {
     currentStockFilter = filter;
     document.querySelectorAll('.filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    event.target.classList.add('active');
     searchComponents();
 }
 
 function applyStockFilter(arr, filter) {
     return arr.filter(c => {
-        const q = parseInt(c.Quantity)||0;
+        const q = parseInt(c.Quantity) || 0;
         if (filter === 'instock') return q > 5;
         if (filter === 'low') return q > 0 && q <= 5;
         if (filter === 'out') return q === 0;
@@ -628,12 +635,9 @@ function applyStockFilter(arr, filter) {
     });
 }
 
-// Export Components to Excel
+// Excel Export
 function exportComponentsToExcel() {
-    if (!allComponents.length) { 
-        showNotification('No components to export', 'warning'); 
-        return; 
-    }
+    if (!allComponents.length) { showNotification('No components', 'warning'); return; }
     
     const data = allComponents.map(c => ({
         'Component ID': c.ComponentID,
@@ -646,25 +650,24 @@ function exportComponentsToExcel() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Components');
-    ws['!cols'] = [{wch:12},{wch:30},{wch:15},{wch:40},{wch:10}];
-    XLSX.writeFile(wb, `ATL_Components_${new Date().toISOString().split('T')[0]}.xlsx`);
-    showNotification('Components exported to Excel!');
+    XLSX.writeFile(wb, `Components_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showNotification('Exported!');
 }
 
 function downloadComponentTemplate() {
     const template = [
-        { ComponentName: 'Arduino Uno', Type: 'Microcontroller', Quantity: 5, Description: 'ATmega328P board' },
-        { ComponentName: 'ESP32', Type: 'Microcontroller', Quantity: 10, Description: 'WiFi+BT module' },
-        { ComponentName: 'Ultrasonic Sensor', Type: 'Sensor', Quantity: 8, Description: 'HC-SR04' }
+        { ComponentName: 'Arduino Uno', Type: 'Microcontroller', Quantity: 5, Description: 'ATmega328P' },
+        { ComponentName: 'ESP32', Type: 'Microcontroller', Quantity: 10, Description: 'WiFi+BT' }
     ];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
     XLSX.writeFile(wb, 'Components_Template.xlsx');
-    showNotification('Template downloaded!');
 }
 
 // Quantity Modal
+let currentQuantityComponentId = null;
+
 function openQuantityModal(id, name, qty) {
     currentQuantityComponentId = id;
     document.getElementById('quantityComponentName').textContent = name;
@@ -679,18 +682,15 @@ function closeQuantityModal() {
 
 function adjustQuantity(amt) {
     const input = document.getElementById('quantityInput');
-    input.value = Math.max(0, (parseInt(input.value)||0) + amt);
+    input.value = Math.max(0, (parseInt(input.value) || 0) + amt);
 }
 
 async function saveQuantity() {
     if (!currentQuantityComponentId) return;
     showLoading();
     try {
-        await apiCall('updateComponentQuantity', { 
-            id: currentQuantityComponentId, 
-            quantity: parseInt(document.getElementById('quantityInput').value)||0 
-        });
-        showNotification('Quantity updated!');
+        await apiCall('updateComponentQuantity', { id: currentQuantityComponentId, quantity: parseInt(document.getElementById('quantityInput').value) || 0 });
+        showNotification('Updated!');
         closeQuantityModal();
         loadComponents();
     } catch (e) { console.error(e); }
@@ -701,8 +701,6 @@ async function saveQuantity() {
 function openImportModal() {
     document.getElementById('importModal').classList.add('show');
     importData = [];
-    document.getElementById('previewSection').style.display = 'none';
-    document.getElementById('confirmImportBtn').disabled = true;
 }
 
 function closeImportModal() {
@@ -717,18 +715,14 @@ function setupDropZone() {
     if (!dz) return;
     dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
     dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-    dz.addEventListener('drop', e => { 
-        e.preventDefault(); 
-        dz.classList.remove('dragover'); 
-        if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); 
-    });
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
 }
 
 function handleFile(file) {
     const reader = new FileReader();
     reader.onload = e => {
         try {
-            const wb = XLSX.read(e.target.result, {type:'binary'});
+            const wb = XLSX.read(e.target.result, { type: 'binary' });
             importData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             showPreview(importData);
         } catch (err) { showNotification('Error reading file', 'error'); }
@@ -737,14 +731,14 @@ function handleFile(file) {
 }
 
 function showPreview(data) {
-    if (!data.length) { showNotification('No data found', 'error'); return; }
+    if (!data.length) { showNotification('No data', 'error'); return; }
     const headers = Object.keys(data[0]);
     document.getElementById('previewTable').innerHTML = `
         <table class="preview-table">
-            <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
-            <tbody>${data.slice(0,5).map(r=>`<tr>${headers.map(h=>`<td>${r[h]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+            <tbody>${data.slice(0, 5).map(r => `<tr>${headers.map(h => `<td>${r[h] || ''}</td>`).join('')}</tr>`).join('')}</tbody>
         </table>`;
-    document.getElementById('previewNote').textContent = `${data.length} rows total`;
+    document.getElementById('previewNote').textContent = `${data.length} rows`;
     document.getElementById('previewSection').style.display = 'block';
     document.getElementById('confirmImportBtn').disabled = false;
 }
@@ -753,24 +747,15 @@ async function confirmImport() {
     if (!importData.length) return;
     showLoading();
     try {
-        const result = await apiCall('bulkAddComponents', { 
-            data: importData.map(i => ({
-                ComponentName: i.ComponentName || i.Name || '',
-                Type: i.Type || '',
-                Quantity: parseInt(i.Quantity) || 0,
-                Description: i.Description || ''
-            }))
-        });
-        showNotification(`Imported ${result.addedCount || importData.length} components!`);
+        const result = await apiCall('importComponentsFromExcel', { data: importData });
+        showNotification(`Added: ${result.added || 0}, Updated: ${result.updated || 0}`);
         closeImportModal();
         loadComponents();
     } catch (e) { console.error(e); }
     hideLoading();
 }
 
-function editComponent(id) { 
-    window.location.href = `component_form.html?id=${id}`; 
-}
+function editComponent(id) { window.location.href = `component_form.html?id=${id}`; }
 
 async function loadComponentForm() {
     const id = getUrlParam('id');
@@ -802,9 +787,9 @@ async function saveComponent(event) {
         Quantity: parseInt(document.getElementById('quantity').value) || 0
     };
     try {
-        if (id) await apiCall('updateComponent', { id, data });
-        else await apiCall('addComponent', { data });
-        showNotification(id ? 'Component updated!' : 'Component added!');
+        if (id) { await apiCall('updateComponent', { id, data }); }
+        else { await apiCall('addComponent', { data }); }
+        showNotification(id ? 'Updated!' : 'Added!');
         window.location.href = 'components.html';
     } catch (e) { console.error(e); }
     hideLoading();
@@ -815,7 +800,6 @@ async function saveComponent(event) {
 // =====================================================
 
 let allCompetitions = [];
-let currentCompFilter = 'all';
 
 async function loadCompetitions() {
     showLoading();
@@ -824,48 +808,34 @@ async function loadCompetitions() {
         allCompetitions = result.data || [];
         updateCompetitionStats();
         renderCompetitionsTable(allCompetitions);
-        renderCalendarView(allCompetitions);
-    } catch (e) { 
-        console.error(e);
-        const tbody = document.getElementById('competitionsTableBody');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="7" class="no-data">Failed to load. <button onclick="loadCompetitions()" class="btn btn-sm btn-primary">Retry</button></td></tr>`;
-        }
-    }
+    } catch (e) { console.error(e); }
     hideLoading();
 }
 
 function updateCompetitionStats() {
-    const upcoming = allCompetitions.filter(c => (c.Status||'').toLowerCase() === 'upcoming').length;
-    const ongoing = allCompetitions.filter(c => (c.Status||'').toLowerCase() === 'ongoing').length;
-    const completed = allCompetitions.filter(c => (c.Status||'').toLowerCase() === 'completed').length;
+    const upcoming = allCompetitions.filter(c => (c.Status || '').toLowerCase() === 'upcoming').length;
+    const ongoing = allCompetitions.filter(c => (c.Status || '').toLowerCase() === 'ongoing').length;
+    const completed = allCompetitions.filter(c => (c.Status || '').toLowerCase() === 'completed').length;
     
     if (document.getElementById('upcomingCount')) document.getElementById('upcomingCount').textContent = upcoming;
     if (document.getElementById('ongoingCount')) document.getElementById('ongoingCount').textContent = ongoing;
     if (document.getElementById('completedCount')) document.getElementById('completedCount').textContent = completed;
-    if (document.getElementById('totalCompetitions')) document.getElementById('totalCompetitions').textContent = allCompetitions.length;
 }
 
 function renderCompetitionsTable(competitions) {
     const tbody = document.getElementById('competitionsTableBody');
     if (!tbody) return;
-    
-    if (!competitions?.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No competitions found. <a href="competition_form.html" class="btn btn-sm btn-primary">Add one</a></td></tr>';
-        return;
-    }
+    if (!competitions?.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">No competitions</td></tr>'; return; }
     
     tbody.innerHTML = competitions.map(c => `
         <tr>
             <td><code>${c.EventID}</code></td>
-            <td><strong>${escapeHtml(c.EventName)}</strong></td>
+            <td><strong>${c.EventName || ''}</strong></td>
             <td>${formatDate(c.Date)}</td>
-            <td>${escapeHtml(c.Location) || '-'}</td>
-            <td><span class="status-badge status-${(c.Status||'upcoming').toLowerCase()}">${c.Status || 'Upcoming'}</span></td>
-            <td>${escapeHtml(c.Position || c.Result) || '-'}</td>
-            <td class="actions">
-                <button class="btn btn-sm btn-info" onclick="viewCompetition('${c.EventID}')">👁️</button>
-                <button class="btn btn-sm btn-warning" onclick="openResultModal('${c.EventID}')">🏆</button>
+            <td>${c.Location || '-'}</td>
+            <td><span class="status-badge status-${(c.Status || 'upcoming').toLowerCase()}">${c.Status || 'Upcoming'}</span></td>
+            <td>${c.Position || c.Result || '-'}</td>
+            <td>
                 <button class="btn btn-sm btn-primary" onclick="editCompetition('${c.EventID}')">✏️</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteCompetition('${c.EventID}')">🗑️</button>
             </td>
@@ -873,209 +843,23 @@ function renderCompetitionsTable(competitions) {
     `).join('');
 }
 
-function renderCalendarView(competitions) {
-    const container = document.getElementById('calendarView');
-    if (!container) return;
-    
-    if (!competitions?.length) {
-        container.innerHTML = '<div class="empty-state"><p>No competitions</p></div>';
-        return;
-    }
-    
-    container.innerHTML = competitions.map(c => {
-        const date = new Date(c.Date);
-        const status = (c.Status||'upcoming').toLowerCase();
-        return `
-            <div class="calendar-card ${status}" onclick="viewCompetition('${c.EventID}')">
-                <div class="calendar-date">
-                    <span class="month">${date.toLocaleDateString('en-US',{month:'short'})}</span>
-                    <span class="day">${date.getDate()||'?'}</span>
-                </div>
-                <div class="calendar-details">
-                    <span class="status-badge status-${status}">${c.Status||'Upcoming'}</span>
-                    <h4>${escapeHtml(c.EventName)}</h4>
-                    <p>📍 ${escapeHtml(c.Location) || 'TBD'}</p>
-                    ${c.Position ? `<p>🏆 ${escapeHtml(c.Position)}</p>` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function searchCompetitions() {
-    const q = (document.getElementById('searchCompetitions')?.value || '').toLowerCase();
-    let filtered = allCompetitions.filter(c => 
-        (c.EventName||'').toLowerCase().includes(q) || (c.Location||'').toLowerCase().includes(q)
-    );
-    if (currentCompFilter !== 'all') filtered = filtered.filter(c => c.Status === currentCompFilter);
-    renderCompetitionsTable(filtered);
-    renderCalendarView(filtered);
-}
-
-function filterCompetitions(status, btn) {
-    currentCompFilter = status;
-    document.querySelectorAll('.filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    searchCompetitions();
-}
-
-function toggleView(view, btn) {
-    const tableView = document.getElementById('tableView');
-    const calendarView = document.getElementById('calendarView');
-    
-    if (view === 'table') {
-        if (tableView) tableView.style.display = 'block';
-        if (calendarView) calendarView.style.display = 'none';
-    } else {
-        if (tableView) tableView.style.display = 'none';
-        if (calendarView) calendarView.style.display = 'grid';
-    }
-    
-    document.querySelectorAll('.view-toggle .btn').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-}
-
-function viewCompetition(eventId) {
-    const comp = allCompetitions.find(c => c.EventID === eventId);
-    if (!comp) return;
-    
-    document.getElementById('modalCompetitionName').textContent = comp.EventName || 'Competition';
-    document.getElementById('modalCompetitionBody').innerHTML = `
-        <div class="competition-detail">
-            <div class="detail-grid">
-                <div class="detail-item"><label>📅 Date</label><span>${formatDate(comp.Date)}${comp.EndDate ? ' - ' + formatDate(comp.EndDate) : ''}</span></div>
-                <div class="detail-item"><label>📍 Location</label><span>${escapeHtml(comp.Location) || 'TBD'}</span></div>
-                <div class="detail-item"><label>📊 Status</label><span class="status-badge status-${(comp.Status||'upcoming').toLowerCase()}">${comp.Status||'Upcoming'}</span></div>
-                <div class="detail-item"><label>🏆 Result</label><span>${escapeHtml(comp.Position || comp.Result) || 'Pending'}</span></div>
-            </div>
-            ${comp.Details ? `<div class="detail-section"><h4>📋 Details</h4><p>${escapeHtml(comp.Details)}</p></div>` : ''}
-            ${comp.Participants ? `<div class="detail-section"><h4>👥 Participants</h4><p>${escapeHtml(comp.Participants)}</p></div>` : ''}
-            ${comp.Notes ? `<div class="detail-section"><h4>📝 Notes</h4><p>${escapeHtml(comp.Notes)}</p></div>` : ''}
-        </div>
-    `;
-    document.getElementById('modalCompEditBtn').onclick = () => { closeCompetitionModal(); editCompetition(eventId); };
-    document.getElementById('competitionModal').classList.add('show');
-}
-
-function closeCompetitionModal() { 
-    document.getElementById('competitionModal').classList.remove('show'); 
-}
-
-function editCompetition(id) { 
-    window.location.href = `competition_form.html?id=${id}`; 
-}
+function editCompetition(id) { window.location.href = `competition_form.html?id=${id}`; }
 
 async function deleteCompetition(id) {
-    if (!confirm('Delete this competition?')) return;
+    if (!confirm('Delete?')) return;
     showLoading();
-    try {
-        await apiCall('deleteCompetition', { id });
-        showNotification('Competition deleted!');
-        loadCompetitions();
-    } catch (e) { console.error(e); }
-    hideLoading();
-}
-
-// Result Modal
-function openResultModal(eventId) {
-    const comp = allCompetitions.find(c => c.EventID === eventId);
-    if (!comp) return;
-    
-    document.getElementById('resultEventId').value = eventId;
-    document.getElementById('resultStatus').value = comp.Status || 'Upcoming';
-    document.getElementById('resultPosition').value = comp.Position || '';
-    document.getElementById('resultNotes').value = comp.Notes || '';
-    document.getElementById('resultModal').classList.add('show');
-}
-
-function closeResultModal() { 
-    document.getElementById('resultModal').classList.remove('show'); 
-}
-
-async function saveResult() {
-    const eventId = document.getElementById('resultEventId').value;
-    if (!eventId) return;
-    
-    showLoading();
-    try {
-        await apiCall('updateCompetitionResult', { 
-            id: eventId, 
-            data: {
-                Status: document.getElementById('resultStatus').value,
-                Position: document.getElementById('resultPosition').value,
-                Notes: document.getElementById('resultNotes').value
-            }
-        });
-        showNotification('Result updated!');
-        closeResultModal();
-        loadCompetitions();
-    } catch (e) { console.error(e); }
-    hideLoading();
-}
-
-// Competition Form
-async function loadCompetitionForm() {
-    const id = getUrlParam('id');
-    if (id) {
-        document.getElementById('formTitle').textContent = 'Edit Competition';
-        showLoading();
-        try {
-            const result = await apiCall('getCompetition', { id });
-            if (result.success && result.data) {
-                const c = result.data;
-                document.getElementById('eventId').value = c.EventID;
-                document.getElementById('eventName').value = c.EventName || '';
-                document.getElementById('eventDate').value = c.Date || '';
-                document.getElementById('endDate').value = c.EndDate || '';
-                document.getElementById('location').value = c.Location || '';
-                document.getElementById('status').value = c.Status || 'Upcoming';
-                document.getElementById('details').value = c.Details || '';
-                document.getElementById('participants').value = c.Participants || '';
-                document.getElementById('result').value = c.Result || '';
-                document.getElementById('position').value = c.Position || '';
-                document.getElementById('notes').value = c.Notes || '';
-            }
-        } catch (e) { console.error(e); }
-        hideLoading();
-    }
-}
-
-async function saveCompetition(event) {
-    event.preventDefault();
-    showLoading();
-    
-    const id = document.getElementById('eventId').value;
-    const data = {
-        EventName: document.getElementById('eventName').value,
-        Date: document.getElementById('eventDate').value,
-        EndDate: document.getElementById('endDate').value,
-        Location: document.getElementById('location').value,
-        Status: document.getElementById('status').value,
-        Details: document.getElementById('details').value,
-        Participants: document.getElementById('participants').value,
-        Result: document.getElementById('result').value,
-        Position: document.getElementById('position').value,
-        Notes: document.getElementById('notes').value
-    };
-    
-    try {
-        if (id) await apiCall('updateCompetition', { id, data });
-        else await apiCall('addCompetition', { data });
-        showNotification(id ? 'Competition updated!' : 'Competition added!');
-        window.location.href = 'competitions.html';
-    } catch (e) { console.error(e); }
+    try { await apiCall('deleteCompetition', { id }); showNotification('Deleted!'); loadCompetitions(); }
+    catch (e) { console.error(e); }
     hideLoading();
 }
 
 // =====================================================
-// ORDERS MODULE
+// ORDERS MODULE - WITH EXCEL IMPORT & MERGE
 // =====================================================
 
 let allOrders = [];
 let orderImportData = [];
-let currentOrderFilter = 'all';
 let currentCompleteOrderId = null;
-let orderItems = [];
 
 async function loadOrders() {
     showLoading();
@@ -1092,24 +876,20 @@ function updateOrderStats() {
     if (document.getElementById('totalOrders')) document.getElementById('totalOrders').textContent = allOrders.length;
     if (document.getElementById('pendingOrders')) document.getElementById('pendingOrders').textContent = allOrders.filter(o => o.Status === 'Ordered').length;
     if (document.getElementById('shippedOrders')) document.getElementById('shippedOrders').textContent = allOrders.filter(o => o.Status === 'Shipped').length;
-    if (document.getElementById('deliveredOrders')) document.getElementById('deliveredOrders').textContent = allOrders.filter(o => o.Status === 'Delivered').length;
     if (document.getElementById('completedOrders')) document.getElementById('completedOrders').textContent = allOrders.filter(o => o.Status === 'Completed').length;
 }
 
-function filterOrders(status, btn) {
-    currentOrderFilter = status;
+function filterOrders(status) {
     document.querySelectorAll('.filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    event.target.classList.add('active');
     renderOrdersList(status === 'all' ? allOrders : allOrders.filter(o => o.Status === status));
 }
 
 function searchOrders() {
     const q = (document.getElementById('searchOrders')?.value || '').toLowerCase();
-    let filtered = allOrders.filter(o => 
-        (o.OrderID||'').toLowerCase().includes(q) || (o.Vendor||'').toLowerCase().includes(q)
-    );
-    if (currentOrderFilter !== 'all') filtered = filtered.filter(o => o.Status === currentOrderFilter);
-    renderOrdersList(filtered);
+    renderOrdersList(allOrders.filter(o => 
+        (o.OrderID || '').toLowerCase().includes(q) || (o.Vendor || '').toLowerCase().includes(q)
+    ));
 }
 
 function renderOrdersList(orders) {
@@ -1118,8 +898,8 @@ function renderOrdersList(orders) {
     
     if (!orders?.length) {
         container.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><h3>No Orders</h3>
-            <div class="empty-actions"><a href="order_form.html" class="btn btn-primary">➕ Create Order</a>
-            <button class="btn btn-secondary" onclick="openImportOrderModal()">📥 Import</button></div></div>`;
+            <a href="order_form.html" class="btn btn-primary">➕ Create Order</a>
+            <button class="btn btn-secondary" onclick="openImportOrderModal()">📥 Import Excel</button></div>`;
         return;
     }
     
@@ -1128,74 +908,39 @@ function renderOrdersList(orders) {
 
 function createOrderCard(order) {
     const items = order.Items || [];
-    const totalQty = parseInt(order.TotalQuantity) || items.reduce((s,i) => s + (parseInt(i.Quantity)||0), 0);
-    const statusIcons = { 'ordered':'🕐', 'shipped':'🚚', 'delivered':'📬', 'completed':'✅', 'cancelled':'❌' };
-    const statusClass = (order.Status||'ordered').toLowerCase();
+    const totalQty = items.reduce((s, i) => s + (parseInt(i.Quantity) || 0), 0);
+    const statusIcons = { 'ordered': '🕐', 'shipped': '🚚', 'delivered': '📬', 'completed': '✅', 'cancelled': '❌' };
+    const statusClass = (order.Status || 'ordered').toLowerCase();
     
     return `
         <div class="order-card ${order.Status === 'Completed' ? 'completed' : ''}">
             <div class="order-card-header">
-                <div class="order-info">
-                    <code class="order-id">${order.OrderID}</code>
-                    <span class="order-vendor">${escapeHtml(order.Vendor)||'Unknown'}</span>
-                </div>
-                <span class="status-badge status-${statusClass}">${statusIcons[statusClass]||'📦'} ${order.Status||'Ordered'}</span>
+                <div><code class="order-id">${order.OrderID}</code><br><span>${order.Vendor || 'Unknown'}</span></div>
+                <span class="status-badge status-${statusClass}">${statusIcons[statusClass] || '📦'} ${order.Status || 'Ordered'}</span>
             </div>
             <div class="order-card-meta">
-                <div class="meta-item"><span class="meta-label">📅 Ordered</span><span class="meta-value">${formatDate(order.OrderDate)||'N/A'}</span></div>
-                <div class="meta-item"><span class="meta-label">🚚 Expected</span><span class="meta-value">${formatDate(order.ExpectedDelivery)||'TBD'}</span></div>
-                <div class="meta-item"><span class="meta-label">📦 Items</span><span class="meta-value">${items.length} types, ${totalQty} units</span></div>
+                <div>📅 ${formatDate(order.OrderDate)}</div>
+                <div>🚚 ${formatDate(order.ExpectedDelivery) || 'TBD'}</div>
+                <div>📦 ${items.length} types, ${totalQty} units</div>
             </div>
-            ${items.length ? `<div class="order-items-preview"><h5>Items</h5>${items.slice(0,3).map(i => 
-                `<div class="order-item-row"><span class="item-name">${escapeHtml(i.ComponentName)}</span><span><span class="item-qty">×${i.Quantity}</span>${i.Synced==='Yes'?'<span class="synced-badge">✓</span>':''}</span></div>`
-            ).join('')}${items.length > 3 ? `<div class="more-items">+${items.length-3} more</div>` : ''}</div>` : ''}
+            ${items.length ? `<div class="order-items-preview">${items.slice(0, 3).map(i => 
+                `<div class="order-item-row"><span>${i.ComponentName}</span><span>×${i.Quantity}</span>${i.Synced === 'Yes' ? '<span class="synced-badge">✓</span>' : ''}</div>`
+            ).join('')}${items.length > 3 ? `<div class="more-items">+${items.length - 3} more</div>` : ''}</div>` : ''}
             <div class="order-card-actions">
                 ${order.Status === 'Delivered' ? `<button class="btn btn-success" onclick="openCompleteOrderModal('${order.OrderID}')">✅ Complete & Merge</button>` : ''}
-                <button class="btn btn-sm btn-info" onclick="viewOrder('${order.OrderID}')">👁️</button>
-                ${order.Status !== 'Completed' ? `<button class="btn btn-sm btn-primary" onclick="editOrder('${order.OrderID}')">✏️</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.OrderID}')">🗑️</button>` : ''}
+                ${order.Status !== 'Completed' ? `<button class="btn btn-sm btn-primary" onclick="editOrder('${order.OrderID}')">✏️</button>` : ''}
+                ${order.Status !== 'Completed' ? `<button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.OrderID}')">🗑️</button>` : ''}
             </div>
         </div>`;
 }
 
-function viewOrder(orderId) {
-    const order = allOrders.find(o => o.OrderID === orderId);
-    if (!order) return;
-    const items = order.Items || [];
-    
-    document.getElementById('viewOrderTitle').textContent = `Order: ${order.OrderID}`;
-    document.getElementById('viewOrderBody').innerHTML = `
-        <div class="order-details-grid">
-            <div class="detail-item"><label>Vendor</label><span>${escapeHtml(order.Vendor)||'N/A'}</span></div>
-            <div class="detail-item"><label>Status</label><span class="status-badge status-${(order.Status||'ordered').toLowerCase()}">${order.Status||'Ordered'}</span></div>
-            <div class="detail-item"><label>Order Date</label><span>${formatDate(order.OrderDate)||'N/A'}</span></div>
-            <div class="detail-item"><label>Expected</label><span>${formatDate(order.ExpectedDelivery)||'TBD'}</span></div>
-        </div>
-        <h4>📋 Items (${items.length})</h4>
-        ${items.length ? `<table class="order-items-table"><thead><tr><th>Component</th><th>Type</th><th>Qty</th><th>Synced</th></tr></thead>
-        <tbody>${items.map(i => `<tr><td>${escapeHtml(i.ComponentName)}</td><td>${escapeHtml(i.Type)||'-'}</td><td>${i.Quantity}</td><td>${i.Synced==='Yes'?'✅':'❌'}</td></tr>`).join('')}</tbody></table>` : '<p>No items</p>'}
-        ${order.Notes ? `<h4>📝 Notes</h4><p>${escapeHtml(order.Notes)}</p>` : ''}
-    `;
-    document.getElementById('viewOrderEditBtn').onclick = () => { closeViewOrderModal(); editOrder(orderId); };
-    document.getElementById('viewOrderModal').classList.add('show');
-}
-
-function closeViewOrderModal() { 
-    document.getElementById('viewOrderModal').classList.remove('show'); 
-}
-
-function editOrder(id) { 
-    window.location.href = `order_form.html?id=${id}`; 
-}
+function editOrder(id) { window.location.href = `order_form.html?id=${id}`; }
 
 async function deleteOrder(id) {
-    if (!confirm('Delete this order?')) return;
+    if (!confirm('Delete?')) return;
     showLoading();
-    try { 
-        await apiCall('deleteOrder', { id }); 
-        showNotification('Order deleted!'); 
-        loadOrders(); 
-    } catch (e) { console.error(e); }
+    try { await apiCall('deleteOrder', { id }); showNotification('Deleted!'); loadOrders(); }
+    catch (e) { console.error(e); }
     hideLoading();
 }
 
@@ -1204,18 +949,19 @@ function openCompleteOrderModal(orderId) {
     currentCompleteOrderId = orderId;
     const order = allOrders.find(o => o.OrderID === orderId);
     if (!order) return;
-    const items = order.Items || [];
     
+    const items = order.Items || [];
     document.getElementById('completeOrderSummary').innerHTML = `
-        <p><strong>Order:</strong> ${order.OrderID} | <strong>Vendor:</strong> ${escapeHtml(order.Vendor)}</p>
+        <p><strong>Order:</strong> ${order.OrderID} | <strong>Vendor:</strong> ${order.Vendor}</p>
         <h5>Items to merge into inventory:</h5>
-        <ul>${items.map(i => `<li>${escapeHtml(i.ComponentName)} <strong>+${i.Quantity}</strong></li>`).join('')}</ul>
-    `;
+        <ul>${items.map(i => `<li>${i.ComponentName} <strong>+${i.Quantity}</strong></li>`).join('')}</ul>
+        <p class="merge-note">💡 Smart matching: "ESP 32" will match "esp32" or "ESP32"</p>`;
+    
     document.getElementById('completeOrderModal').classList.add('show');
 }
 
-function closeCompleteOrderModal() { 
-    document.getElementById('completeOrderModal').classList.remove('show'); 
+function closeCompleteOrderModal() {
+    document.getElementById('completeOrderModal').classList.remove('show');
     currentCompleteOrderId = null;
 }
 
@@ -1225,54 +971,48 @@ async function confirmCompleteOrder() {
     closeCompleteOrderModal();
     
     try {
-        const result = await apiCall('completeOrder', { id: currentCompleteOrderId });
+        const result = await apiCall('completeOrderEnhanced', { id: currentCompleteOrderId });
         if (result.success) {
             showMergeResults(result);
+            loadOrders();
         }
-        loadOrders();
     } catch (e) { console.error(e); }
     hideLoading();
 }
 
 function showMergeResults(result) {
-    const syncResults = result.syncResults || [];
-    const merged = syncResults.filter(r => r.action === 'updated' || r.action === 'merged');
-    const created = syncResults.filter(r => r.action === 'created');
+    const merged = (result.syncResults || []).filter(r => r.action === 'merged');
+    const created = (result.syncResults || []).filter(r => r.action === 'created');
     
     document.getElementById('mergeResultsContent').innerHTML = `
         <div class="merge-results">
             <div class="merge-summary">
-                <div class="summary-item success"><span class="summary-number">${merged.length}</span><span class="summary-label">Updated</span></div>
-                <div class="summary-item info"><span class="summary-number">${created.length}</span><span class="summary-label">Created</span></div>
+                <div class="summary-item success"><span class="summary-number">${merged.length}</span><span>Updated</span></div>
+                <div class="summary-item info"><span class="summary-number">${created.length}</span><span>Created</span></div>
             </div>
-            ${merged.length ? `<div class="result-section"><h5>🔄 Updated Components</h5><ul>${merged.map(r => 
-                `<li><span>${escapeHtml(r.matchedWith || r.name || r.itemName)}</span> <span>${r.previousQty || 0} → <strong>${r.newQty}</strong> (+${r.addedQty || r.added || r.quantity})</span></li>`
-            ).join('')}</ul></div>` : ''}
-            ${created.length ? `<div class="result-section"><h5>➕ New Components</h5><ul>${created.map(r => 
-                `<li><span>${escapeHtml(r.itemName || r.name)}</span> <strong>+${r.quantity}</strong></li>`
-            ).join('')}</ul></div>` : ''}
-        </div>
-    `;
+            ${merged.length ? `<div class="result-section"><h5>🔄 Merged:</h5><ul>${merged.map(r => 
+                `<li>${r.matchedWith}: ${r.previousQty} → <strong>${r.newQty}</strong> (+${r.addedQty})</li>`).join('')}</ul></div>` : ''}
+            ${created.length ? `<div class="result-section"><h5>➕ Created:</h5><ul>${created.map(r => 
+                `<li>${r.itemName}: <strong>${r.quantity}</strong></li>`).join('')}</ul></div>` : ''}
+        </div>`;
+    
     document.getElementById('mergeResultsModal').classList.add('show');
 }
 
-function closeMergeResultsModal() { 
-    document.getElementById('mergeResultsModal').classList.remove('show'); 
+function closeMergeResultsModal() {
+    document.getElementById('mergeResultsModal').classList.remove('show');
 }
 
 // Import Order Modal
 function openImportOrderModal() {
     document.getElementById('importOrderModal').classList.add('show');
     orderImportData = [];
-    document.getElementById('orderPreviewSection').style.display = 'none';
-    document.getElementById('confirmOrderImportBtn').disabled = true;
-    document.getElementById('importVendor').value = '';
-    document.getElementById('importOrderDate').valueAsDate = new Date();
-    document.getElementById('importExpectedDelivery').value = '';
 }
 
-function closeImportOrderModal() { 
-    document.getElementById('importOrderModal').classList.remove('show'); 
+function closeImportOrderModal() {
+    document.getElementById('importOrderModal').classList.remove('show');
+    document.getElementById('orderPreviewSection').style.display = 'none';
+    document.getElementById('confirmOrderImportBtn').disabled = true;
     orderImportData = [];
 }
 
@@ -1281,18 +1021,14 @@ function setupOrderDropZone() {
     if (!dz) return;
     dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
     dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-    dz.addEventListener('drop', e => { 
-        e.preventDefault(); 
-        dz.classList.remove('dragover'); 
-        if (e.dataTransfer.files[0]) handleOrderFile(e.dataTransfer.files[0]); 
-    });
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleOrderFile(e.dataTransfer.files[0]); });
 }
 
 function handleOrderFile(file) {
     const reader = new FileReader();
     reader.onload = e => {
         try {
-            const wb = XLSX.read(e.target.result, {type:'binary'});
+            const wb = XLSX.read(e.target.result, { type: 'binary' });
             orderImportData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             showOrderPreview(orderImportData);
         } catch (err) { showNotification('Error reading file', 'error'); }
@@ -1301,7 +1037,7 @@ function handleOrderFile(file) {
 }
 
 function showOrderPreview(data) {
-    if (!data?.length) { showNotification('No data found', 'error'); return; }
+    if (!data.length) { showNotification('No data', 'error'); return; }
     
     const totalQty = data.reduce((s, i) => s + (parseInt(i.Quantity || i.quantity) || 0), 0);
     
@@ -1309,14 +1045,15 @@ function showOrderPreview(data) {
         <table class="preview-table">
             <thead><tr><th>Component</th><th>Type</th><th>Qty</th></tr></thead>
             <tbody>${data.slice(0, 10).map(i => `<tr>
-                <td>${escapeHtml(i.ComponentName || i.Name || i.name || '')}</td>
-                <td>${escapeHtml(i.Type || i.type || '')}</td>
+                <td>${i.ComponentName || i.Name || i.name || ''}</td>
+                <td>${i.Type || i.type || ''}</td>
                 <td>${i.Quantity || i.quantity || 0}</td>
-            </tr>`).join('')}${data.length > 10 ? `<tr><td colspan="3" style="text-align:center;font-style:italic;">...and ${data.length - 10} more</td></tr>` : ''}</tbody>
+            </tr>`).join('')}</tbody>
         </table>`;
     
     document.getElementById('previewTotalItems').textContent = data.length;
     document.getElementById('previewTotalQty').textContent = totalQty;
+    document.getElementById('importOrderDate').valueAsDate = new Date();
     document.getElementById('orderPreviewSection').style.display = 'block';
     document.getElementById('confirmOrderImportBtn').disabled = false;
 }
@@ -1331,41 +1068,51 @@ function downloadOrderTemplate() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Order');
     XLSX.writeFile(wb, 'Order_Template.xlsx');
-    showNotification('Template downloaded!');
 }
 
 async function confirmOrderImport() {
-    if (!orderImportData?.length) return;
+    if (!orderImportData.length) return;
     
     showLoading();
     try {
         const orderData = {
-            Vendor: document.getElementById('importVendor')?.value || 'Imported Order',
-            OrderDate: document.getElementById('importOrderDate')?.value || new Date().toISOString().split('T')[0],
-            ExpectedDelivery: document.getElementById('importExpectedDelivery')?.value || '',
-            Status: 'Ordered',
-            Notes: 'Imported from Excel',
-            Items: orderImportData.map(i => ({
+            vendor: document.getElementById('importVendor')?.value || 'Imported',
+            orderDate: document.getElementById('importOrderDate')?.value || new Date().toISOString().split('T')[0],
+            expectedDelivery: document.getElementById('importExpectedDelivery')?.value || '',
+            items: orderImportData.map(i => ({
                 ComponentName: i.ComponentName || i.Name || i.name || '',
                 Type: i.Type || i.type || '',
                 Quantity: parseInt(i.Quantity || i.quantity) || 0
             }))
         };
         
-        await apiCall('addOrder', { data: orderData });
-        showNotification('Order imported successfully!');
+        const result = await apiCall('importOrderFromExcel', { data: orderData });
+        showNotification('Order imported!');
         closeImportOrderModal();
         loadOrders();
     } catch (e) { console.error(e); }
     hideLoading();
 }
 
-// Order Form
+// =====================================================
+// ORDER FORM
+// =====================================================
+
+let orderItems = [];
+
 async function loadOrderForm() {
     const orderId = getUrlParam('id');
     orderItems = [];
     
-    document.getElementById('orderDate').valueAsDate = new Date();
+    // Load components for dropdown
+    try {
+        const result = await apiCall('getComponents');
+        const select = document.getElementById('componentSelect');
+        if (select && result.data) {
+            select.innerHTML = '<option value="">-- Select Component --</option>' + 
+                result.data.map(c => `<option value="${c.ComponentID}" data-name="${c.ComponentName}" data-type="${c.Type}">${c.ComponentName} (${c.Quantity} in stock)</option>`).join('');
+        }
+    } catch (e) { console.error(e); }
     
     if (orderId) {
         document.getElementById('formTitle').textContent = 'Edit Order';
@@ -1383,12 +1130,15 @@ async function loadOrderForm() {
                 
                 orderItems = (order.Items || []).map(i => ({
                     ComponentName: i.ComponentName,
-                    Type: i.Type || '',
+                    Type: i.Type,
                     Quantity: parseInt(i.Quantity) || 0
                 }));
+                renderOrderItems();
             }
         } catch (e) { console.error(e); }
         hideLoading();
+    } else {
+        document.getElementById('orderDate').valueAsDate = new Date();
     }
     
     renderOrderItems();
@@ -1403,10 +1153,7 @@ function addOrderItem() {
     const type = typeInput?.value.trim() || '';
     const qty = parseInt(qtyInput?.value) || 1;
     
-    if (!name) { 
-        showNotification('Enter component name', 'warning'); 
-        return; 
-    }
+    if (!name) { showNotification('Enter component name', 'warning'); return; }
     
     orderItems.push({ ComponentName: name, Type: type, Quantity: qty });
     renderOrderItems();
@@ -1414,7 +1161,6 @@ function addOrderItem() {
     if (nameInput) nameInput.value = '';
     if (typeInput) typeInput.value = '';
     if (qtyInput) qtyInput.value = '1';
-    nameInput?.focus();
 }
 
 function removeOrderItem(index) {
@@ -1422,17 +1168,12 @@ function removeOrderItem(index) {
     renderOrderItems();
 }
 
-function updateItemQty(index, value) {
-    orderItems[index].Quantity = parseInt(value) || 1;
-    updateOrderTotals();
-}
-
 function renderOrderItems() {
     const container = document.getElementById('orderItemsContainer');
     if (!container) return;
     
     if (!orderItems.length) {
-        container.innerHTML = '<div class="no-items">No items added yet. Add items above.</div>';
+        container.innerHTML = '<div class="no-items">No items added yet</div>';
         updateOrderTotals();
         return;
     }
@@ -1442,8 +1183,8 @@ function renderOrderItems() {
             <thead><tr><th>Component</th><th>Type</th><th>Qty</th><th></th></tr></thead>
             <tbody>${orderItems.map((item, i) => `
                 <tr>
-                    <td><strong>${escapeHtml(item.ComponentName)}</strong></td>
-                    <td>${escapeHtml(item.Type) || '-'}</td>
+                    <td>${item.ComponentName}</td>
+                    <td>${item.Type || '-'}</td>
                     <td><input type="number" class="qty-input-sm" value="${item.Quantity}" min="1" onchange="updateItemQty(${i}, this.value)"></td>
                     <td><button type="button" class="btn btn-sm btn-danger" onclick="removeOrderItem(${i})">✕</button></td>
                 </tr>
@@ -1453,9 +1194,14 @@ function renderOrderItems() {
     updateOrderTotals();
 }
 
+function updateItemQty(index, value) {
+    orderItems[index].Quantity = parseInt(value) || 1;
+    updateOrderTotals();
+}
+
 function updateOrderTotals() {
     const totalItems = orderItems.length;
-    const totalQty = orderItems.reduce((s, i) => s + (parseInt(i.Quantity) || 0), 0);
+    const totalQty = orderItems.reduce((s, i) => s + (i.Quantity || 0), 0);
     if (document.getElementById('totalItemsCount')) document.getElementById('totalItemsCount').textContent = totalItems;
     if (document.getElementById('totalQuantityCount')) document.getElementById('totalQuantityCount').textContent = totalQty;
 }
@@ -1463,10 +1209,7 @@ function updateOrderTotals() {
 async function saveOrder(event) {
     event.preventDefault();
     
-    if (!orderItems.length) { 
-        showNotification('Add at least one item', 'warning'); 
-        return; 
-    }
+    if (!orderItems.length) { showNotification('Add at least one item', 'warning'); return; }
     
     const data = {
         Vendor: document.getElementById('vendor').value,
@@ -1492,8 +1235,4 @@ async function saveOrder(event) {
     hideLoading();
 }
 
-// =====================================================
-// INITIALIZATION
-// =====================================================
-
-console.log('✅ Script.js loaded successfully');
+console.log('✅ Script.js loaded');
