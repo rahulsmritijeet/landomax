@@ -25,8 +25,9 @@
                 <a href="projects.html" class="nav-link active">Projects</a>
                 <a href="components.html" class="nav-link">Components</a>
                 <a href="competitions.html" class="nav-link">Competitions</a>
+                <a href="orders.html" class="nav-link">Orders</a>
                 <div class="nav-divider"></div>
-                <button class="nav-link logout-btn" onclick="logout()">🚪 Logout</button>
+                <button class="nav-link logout-btn" onclick="logout()">Logout</button>
             </nav>
         </div>
     </header>
@@ -55,7 +56,7 @@
 
                 <div class="form-group">
                     <label class="form-label">Overview / Description</label>
-                    <textarea id="overview" class="form-control" placeholder="Brief overview of the project - what it does, why it's useful, etc." rows="4"></textarea>
+                    <textarea id="overview" class="form-control" placeholder="Brief overview of the project..." rows="4"></textarea>
                 </div>
             </div>
 
@@ -63,17 +64,12 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">👥 Team Members</h3>
-                    <small class="text-muted">Students who worked on this project</small>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">
-                        Team Members / Students
-                    </label>
+                    <label class="form-label">Students who worked on this project</label>
                     <div class="team-members-input-wrapper">
-                        <div class="team-members-chips" id="teamMembersChips">
-                            <!-- Chips will be added here -->
-                        </div>
+                        <div class="team-members-chips" id="teamMembersChips"></div>
                         <input 
                             type="text" 
                             id="teamMemberInput" 
@@ -83,14 +79,69 @@
                         >
                     </div>
                     <input type="hidden" id="teamMembers">
-                    <small class="form-hint">💡 Type each student's name and press Enter to add. Click on a name to remove it.</small>
+                    <small class="form-hint">💡 Press Enter after each name</small>
                 </div>
                 
-                <!-- Quick Add Suggestions -->
                 <div class="quick-add-section">
                     <label class="form-label">Quick Add Previous Students:</label>
-                    <div class="quick-add-chips" id="previousStudents">
-                        <!-- Will be populated with previously used names -->
+                    <div class="quick-add-chips" id="previousStudents"></div>
+                </div>
+            </div>
+
+            <!-- Components Card - NEW WITH QUANTITY -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">⚙️ Components Used</h3>
+                    <span class="selected-count" id="selectedCount">(0 components)</span>
+                </div>
+                
+                <div class="component-selection-info">
+                    <p>💡 Select components and specify how many of each are required for this project.</p>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="component-search-wrapper">
+                    <div class="search-input-container">
+                        <span class="search-icon">🔍</span>
+                        <input 
+                            type="text" 
+                            id="componentSearch" 
+                            class="search-input-field" 
+                            placeholder="Search components..."
+                            oninput="searchComponentsInForm(this.value)"
+                        >
+                        <button type="button" class="clear-search-btn" onclick="clearComponentSearch()">✕</button>
+                    </div>
+                    
+                    <div class="quick-filters">
+                        <button type="button" class="filter-chip active" onclick="filterByType('all')">All</button>
+                        <button type="button" class="filter-chip" onclick="filterByType('Microcontroller')">🎛️ MCU</button>
+                        <button type="button" class="filter-chip" onclick="filterByType('Sensor')">📡 Sensor</button>
+                        <button type="button" class="filter-chip" onclick="filterByType('Motor')">⚙️ Motor</button>
+                        <button type="button" class="filter-chip" onclick="filterByType('LED')">💡 LED</button>
+                        <button type="button" class="filter-chip" onclick="filterByType('Module')">📦 Module</button>
+                    </div>
+                </div>
+
+                <!-- Available Components List -->
+                <div class="components-selection-container">
+                    <div class="available-components">
+                        <h4>📦 Available Components</h4>
+                        <div id="availableComponentsList" class="components-list">
+                            <div class="loading-components">
+                                <div class="spinner-small"></div>
+                                Loading components...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="selected-components">
+                        <h4>✅ Selected for Project <span id="selectedTotal">(0 total)</span></h4>
+                        <div id="selectedComponentsList" class="components-list">
+                            <div class="no-selection-message">
+                                <span>👈</span> Click components to add them
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -103,71 +154,7 @@
                 
                 <div class="form-group">
                     <label class="form-label">Code, Links, or Additional Notes</label>
-                    <textarea id="code" class="form-control code-textarea" placeholder="Paste code snippets, GitHub links, documentation, or any additional notes..." rows="8"></textarea>
-                </div>
-            </div>
-
-            <!-- Components Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">⚙️ Components Used</h3>
-                    <span class="selected-count" id="selectedCount">(0 selected)</span>
-                </div>
-                
-                <!-- Search Bar -->
-                <div class="component-search-wrapper">
-                    <div class="search-input-container">
-                        <span class="search-icon">🔍</span>
-                        <input 
-                            type="text" 
-                            id="componentSearch" 
-                            class="search-input-field" 
-                            placeholder="Search components by name, type, or ID..."
-                            oninput="searchComponentsInForm(this.value)"
-                            autocomplete="off"
-                        >
-                        <button type="button" class="clear-search-btn" onclick="clearComponentSearch()" title="Clear search">✕</button>
-                    </div>
-                    
-                    <!-- Quick Filters -->
-                    <div class="quick-filters">
-                        <button type="button" class="filter-chip active" onclick="filterByType('all')">All</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('Microcontroller')">🎛️ Microcontroller</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('Sensor')">📡 Sensor</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('Motor')">⚙️ Motor</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('LED')">💡 LED</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('Module')">📦 Module</button>
-                        <button type="button" class="filter-chip" onclick="filterByType('other')">📋 Other</button>
-                    </div>
-                    
-                    <!-- Selection Actions -->
-                    <div class="selection-actions">
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllVisible()">
-                            ☑️ Select All Visible
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAll()">
-                            ⬜ Deselect All
-                        </button>
-                        <span class="results-count" id="resultsCount">Loading...</span>
-                    </div>
-                </div>
-                
-                <!-- Components List -->
-                <div id="componentsUsed" class="checkbox-group enhanced">
-                    <div class="loading-components">
-                        <div class="spinner-small"></div>
-                        Loading components...
-                    </div>
-                </div>
-                
-                <!-- Selected Components Preview -->
-                <div class="selected-preview" id="selectedPreview">
-                    <div class="selected-preview-header">
-                        <span>📦 Selected Components:</span>
-                    </div>
-                    <div class="selected-chips" id="selectedChips">
-                        <span class="no-selection">No components selected</span>
-                    </div>
+                    <textarea id="code" class="form-control code-textarea" placeholder="Paste code snippets, GitHub links, documentation..." rows="6"></textarea>
                 </div>
             </div>
 
@@ -190,14 +177,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             if (!checkAuth()) return;
             loadProjectForm();
-        });
-        
-        // Keyboard shortcut: Ctrl+F to focus search
-        document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                document.getElementById('componentSearch').focus();
-            }
         });
     </script>
 </body>
