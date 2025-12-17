@@ -26,6 +26,8 @@
                 <a href="components.html" class="nav-link">Components</a>
                 <a href="competitions.html" class="nav-link active">Competitions</a>
                 <a href="orders.html" class="nav-link">Orders</a>
+                <div class="nav-divider"></div>
+                <button class="nav-link logout-btn" onclick="logout()">Logout</button>
             </nav>
         </div>
     </header>
@@ -35,63 +37,62 @@
         <div class="page-header">
             <h1 class="page-title">🏆 Competitions</h1>
             <div class="header-actions">
+                <input type="text" id="searchCompetitions" class="search-input" placeholder="🔍 Search competitions..." oninput="searchCompetitions()">
                 <div class="view-toggle">
-                    <button id="tableViewBtn" class="btn btn-sm active" onclick="toggleView('table')">📋 Table</button>
-                    <button id="calendarViewBtn" class="btn btn-sm" onclick="toggleView('calendar')">📅 Calendar</button>
+                    <button class="btn btn-sm active" onclick="toggleView('table', this)">📋 Table</button>
+                    <button class="btn btn-sm" onclick="toggleView('calendar', this)">📅 Calendar</button>
                 </div>
-                <a href="competition_form.html" class="btn btn-primary">
-                    <span>➕</span> Add Competition
-                </a>
+                <a href="competition_form.html" class="btn btn-primary">➕ Add Competition</a>
             </div>
         </div>
 
-        <!-- Stats Cards -->
-        <div class="stats-grid" id="competitionStats">
-            <div class="stat-card upcoming">
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card warning">
                 <div class="stat-icon">📅</div>
                 <div class="stat-info">
                     <span class="stat-value" id="upcomingCount">0</span>
                     <span class="stat-label">Upcoming</span>
                 </div>
             </div>
-            <div class="stat-card ongoing">
-                <div class="stat-icon">🔴</div>
+            <div class="stat-card info">
+                <div class="stat-icon">🔄</div>
                 <div class="stat-info">
                     <span class="stat-value" id="ongoingCount">0</span>
                     <span class="stat-label">Ongoing</span>
                 </div>
             </div>
-            <div class="stat-card completed">
+            <div class="stat-card success">
                 <div class="stat-icon">✅</div>
                 <div class="stat-info">
                     <span class="stat-value" id="completedCount">0</span>
                     <span class="stat-label">Completed</span>
                 </div>
             </div>
-            <div class="stat-card wins">
-                <div class="stat-icon">🥇</div>
+            <div class="stat-card">
+                <div class="stat-icon">🏆</div>
                 <div class="stat-info">
-                    <span class="stat-value" id="winsCount">0</span>
-                    <span class="stat-label">Wins/Top 3</span>
+                    <span class="stat-value" id="totalCompetitions">0</span>
+                    <span class="stat-label">Total</span>
                 </div>
             </div>
         </div>
 
         <!-- Filter Tabs -->
         <div class="filter-tabs">
-            <button class="filter-tab active" onclick="filterCompetitions('all')">All</button>
-            <button class="filter-tab" onclick="filterCompetitions('upcoming')">Upcoming</button>
-            <button class="filter-tab" onclick="filterCompetitions('ongoing')">Ongoing</button>
-            <button class="filter-tab" onclick="filterCompetitions('completed')">Completed</button>
+            <button class="filter-tab active" onclick="filterCompetitions('all', this)">📋 All</button>
+            <button class="filter-tab" onclick="filterCompetitions('Upcoming', this)">📅 Upcoming</button>
+            <button class="filter-tab" onclick="filterCompetitions('Ongoing', this)">🔄 Ongoing</button>
+            <button class="filter-tab" onclick="filterCompetitions('Completed', this)">✅ Completed</button>
         </div>
 
         <!-- Table View -->
-        <div class="card" id="tableView">
+        <div id="tableView" class="card">
             <div class="table-container">
-                <table>
+                <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Event ID</th>
+                            <th>ID</th>
                             <th>Event Name</th>
                             <th>Date</th>
                             <th>Location</th>
@@ -102,7 +103,9 @@
                     </thead>
                     <tbody id="competitionsTableBody">
                         <tr>
-                            <td colspan="7" class="no-data">Loading...</td>
+                            <td colspan="7" class="loading-cell">
+                                <div class="spinner-small"></div> Loading...
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -110,55 +113,50 @@
         </div>
 
         <!-- Calendar View -->
-        <div id="calendarView" class="calendar-grid"></div>
+        <div id="calendarView" class="calendar-grid" style="display: none;">
+            <!-- Calendar cards will be loaded here -->
+        </div>
     </main>
 
-    <!-- Result Modal -->
+    <!-- View Competition Modal -->
+    <div class="modal" id="competitionModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 id="modalCompetitionName">Competition Details</h3>
+                <button class="modal-close" onclick="closeCompetitionModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalCompetitionBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="modalCompEditBtn">✏️ Edit</button>
+                <button class="btn btn-secondary" onclick="closeCompetitionModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Result Modal -->
     <div class="modal" id="resultModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>🏆 Update Competition Result</h3>
+                <h3>🏆 Update Result</h3>
                 <button class="modal-close" onclick="closeResultModal()">✕</button>
             </div>
             <div class="modal-body">
-                <h4 id="resultEventName" class="result-event-name"></h4>
-                
+                <input type="hidden" id="resultEventId">
                 <div class="form-group">
                     <label class="form-label">Status</label>
                     <select id="resultStatus" class="form-control">
-                        <option value="Upcoming">Upcoming</option>
-                        <option value="Ongoing">Ongoing</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Upcoming">📅 Upcoming</option>
+                        <option value="Ongoing">🔄 Ongoing</option>
+                        <option value="Completed">✅ Completed</option>
                     </select>
                 </div>
-                
                 <div class="form-group">
-                    <label class="form-label">Position / Achievement</label>
-                    <select id="resultPosition" class="form-control">
-                        <option value="">-- Select Position --</option>
-                        <option value="1st Place">🥇 1st Place</option>
-                        <option value="2nd Place">🥈 2nd Place</option>
-                        <option value="3rd Place">🥉 3rd Place</option>
-                        <option value="Finalist">🏅 Finalist</option>
-                        <option value="Semi-Finalist">Semi-Finalist</option>
-                        <option value="Quarter-Finalist">Quarter-Finalist</option>
-                        <option value="Participated">Participated</option>
-                        <option value="Special Mention">⭐ Special Mention</option>
-                        <option value="Best Innovation">💡 Best Innovation</option>
-                        <option value="Best Design">🎨 Best Design</option>
-                        <option value="Other">Other</option>
-                    </select>
+                    <label class="form-label">Position / Result</label>
+                    <input type="text" id="resultPosition" class="form-control" placeholder="e.g., 1st Place, Winner, Finalist">
                 </div>
-                
                 <div class="form-group">
-                    <label class="form-label">Result Details</label>
-                    <textarea id="resultDetails" class="form-control" placeholder="Describe the achievement, project presented, feedback received..."></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Additional Notes</label>
-                    <textarea id="resultNotes" class="form-control" placeholder="Any other notes..."></textarea>
+                    <label class="form-label">Notes</label>
+                    <textarea id="resultNotes" class="form-control" rows="3" placeholder="Additional notes about the result..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -172,14 +170,10 @@
     <script src="js/script.js"></script>
     <script src="js/auth.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', loadCompetitions);
-
-        // Check authentication on page load
         document.addEventListener('DOMContentLoaded', function() {
-            checkAuth();
-            updateSessionInfo();
+            if (typeof checkAuth === 'function' && !checkAuth()) return;
+            loadCompetitions();
         });
-
     </script>
 </body>
 </html>
