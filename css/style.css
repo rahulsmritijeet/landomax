@@ -2180,3 +2180,228 @@ code {
     font-size: 48px;
     margin-bottom: 16px;
 }
+
+/* =====================================================
+   ORDERS - ADDITIONAL STYLES
+   ===================================================== */
+
+/* Smart Match Info Box */
+.smart-match-info {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    padding: 16px;
+    border-radius: 12px;
+    margin: 16px 0;
+    border-left: 4px solid #10b981;
+}
+
+.smart-match-info strong {
+    color: #065f46;
+}
+
+.smart-match-info ul {
+    margin: 8px 0 0 20px;
+    padding: 0;
+}
+
+.smart-match-info li {
+    color: #065f46;
+    margin: 4px 0;
+}
+
+/* Order Summary Box */
+.order-summary-box {
+    background: var(--background-color);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.order-summary-box .summary-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.items-to-add {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Results Table */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+
+.results-table th,
+.results-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.results-table th {
+    background: var(--background-color);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.results-table .added-qty {
+    color: #059669;
+    font-weight: 600;
+}
+
+.results-table .new-qty {
+    color: var(--primary-color);
+}
+
+/* Result Sections */
+.result-section {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--background-color);
+    border-radius: 12px;
+}
+
+.result-section h5 {
+    margin: 0 0 8px 0;
+}
+
+.result-note {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+/* Success Message */
+.success-message {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 24px;
+    text-align: center;
+}
+
+.success-message p {
+    margin: 0;
+    color: #166534;
+    font-weight: 500;
+}
+
+/* Completed Badge */
+.completed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    color: #166534;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.pending-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.synced-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: #dcfce7;
+    color: #166534;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+/* Completed Order Card */
+.order-card.completed {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-color: #e2e8f0;
+}
+
+.order-card.completed .order-card-header {
+    opacity: 0.9;
+}
+
+/* Completed Info Box */
+.completed-info {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+.completed-info p {
+    margin: 0;
+    color: #166534;
+}
+
+/* Info Card */
+.info-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #93c5fd;
+}
+
+.info-card .card-title {
+    color: #1e40af;
+}
+
+.info-card p {
+    color: #1e40af;
+    margin-bottom: 12px;
+}
+
+.info-card ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.info-card li {
+    color: #1e40af;
+    margin: 6px 0;
+}
+
+/* Item S.No */
+.item-sno {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 8px;
+}
+
+/* Mini Table */
+.mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.mini-table th,
+.mini-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mini-table th {
+    background: rgba(0,0,0,0.03);
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* Form Hint */
+.form-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
