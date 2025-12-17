@@ -56,7 +56,7 @@
                 <div class="stat-icon">🕐</div>
                 <div class="stat-info">
                     <span class="stat-value" id="pendingOrders">0</span>
-                    <span class="stat-label">Ordered</span>
+                    <span class="stat-label">Pending</span>
                 </div>
             </div>
             <div class="stat-card info">
@@ -64,13 +64,6 @@
                 <div class="stat-info">
                     <span class="stat-value" id="shippedOrders">0</span>
                     <span class="stat-label">Shipped</span>
-                </div>
-            </div>
-            <div class="stat-card primary">
-                <div class="stat-icon">📬</div>
-                <div class="stat-info">
-                    <span class="stat-value" id="deliveredOrders">0</span>
-                    <span class="stat-label">Delivered</span>
                 </div>
             </div>
             <div class="stat-card success">
@@ -87,7 +80,6 @@
             <button class="filter-tab active" onclick="filterOrders('all', this)">📋 All Orders</button>
             <button class="filter-tab" onclick="filterOrders('Ordered', this)">🕐 Ordered</button>
             <button class="filter-tab" onclick="filterOrders('Shipped', this)">🚚 Shipped</button>
-            <button class="filter-tab" onclick="filterOrders('Delivered', this)">📬 Delivered</button>
             <button class="filter-tab" onclick="filterOrders('Completed', this)">✅ Completed</button>
         </div>
 
@@ -111,10 +103,20 @@
                 <div class="import-instructions">
                     <h4>📋 How to Import:</h4>
                     <ol>
-                        <li>Excel columns: <code>ComponentName</code>, <code>Quantity</code>, <code>Type</code> (optional)</li>
-                        <li>Save as <strong>.xlsx</strong> or <strong>.csv</strong></li>
+                        <li>Download the template below</li>
+                        <li>Fill in: <code>S.No</code>, <code>ComponentName</code>, <code>Type</code>, <code>Quantity</code></li>
+                        <li>Save and upload the file</li>
                     </ol>
-                    <button class="btn btn-secondary btn-sm" onclick="downloadOrderTemplate()">📄 Download Template</button>
+                    <div class="smart-match-info">
+                        <strong>🧠 Smart Matching:</strong> When you complete an order, components are matched intelligently:
+                        <ul>
+                            <li>"ESP 32" matches "esp32" or "ESP32"</li>
+                            <li>"Arduino UNO" matches "arduinouno"</li>
+                            <li>If found → quantity is ADDED to existing</li>
+                            <li>If not found → new component is created</li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-secondary" onclick="downloadOrderTemplate()">📄 Download Template</button>
                 </div>
 
                 <div class="file-upload-zone" id="orderDropZone">
@@ -129,8 +131,8 @@
                     <h4>📦 Order Details</h4>
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Vendor Name</label>
-                            <input type="text" id="importVendor" class="form-control" placeholder="Amazon, Robu.in...">
+                            <label class="form-label">Vendor Name <span class="required">*</span></label>
+                            <input type="text" id="importVendor" class="form-control" placeholder="Amazon, Robu.in, Electronicscomp...">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Order Date</label>
@@ -141,8 +143,10 @@
                             <input type="date" id="importExpectedDelivery" class="form-control">
                         </div>
                     </div>
+                    
                     <h4>📋 Items Preview</h4>
                     <div id="orderItemsPreview"></div>
+                    
                     <div class="preview-stats">
                         <span>Total Items: <strong id="previewTotalItems">0</strong></span>
                         <span>Total Quantity: <strong id="previewTotalQty">0</strong></span>
@@ -175,7 +179,7 @@
     <div class="modal" id="completeOrderModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>✅ Complete Order & Merge Inventory</h3>
+                <h3>✅ Complete Order & Add to Inventory</h3>
                 <button class="modal-close" onclick="closeCompleteOrderModal()">✕</button>
             </div>
             <div class="modal-body">
@@ -183,18 +187,18 @@
                 <div class="merge-explanation">
                     <h4>🔄 What will happen:</h4>
                     <ul>
-                        <li>✅ Existing components → quantity increased</li>
-                        <li>➕ New components → added to inventory</li>
-                        <li>🧠 Smart matching: "ESP 32" = "esp32" = "ESP32"</li>
-                        <li>📝 Order status → Completed</li>
+                        <li>🧠 <strong>Smart Matching</strong> - "ESP 32" will match "esp32" or "ESP32"</li>
+                        <li>➕ <strong>If component exists</strong> → quantity will be ADDED</li>
+                        <li>🆕 <strong>If component is new</strong> → it will be created</li>
+                        <li>📝 Order status → <strong>Completed</strong></li>
                     </ul>
                 </div>
                 <div class="warning-box">
-                    <strong>⚠️ Note:</strong> This action cannot be undone.
+                    <strong>⚠️ Note:</strong> This will add all items to your components inventory.
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-success btn-lg" onclick="confirmCompleteOrder()">✅ Complete & Merge</button>
+                <button class="btn btn-success btn-lg" onclick="confirmCompleteOrder()">✅ Complete & Add to Inventory</button>
                 <button class="btn btn-secondary" onclick="closeCompleteOrderModal()">Cancel</button>
             </div>
         </div>
@@ -202,14 +206,14 @@
 
     <!-- Merge Results Modal -->
     <div class="modal" id="mergeResultsModal">
-        <div class="modal-content">
+        <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h3>🎉 Order Completed!</h3>
+                <h3>🎉 Order Completed Successfully!</h3>
                 <button class="modal-close" onclick="closeMergeResultsModal()">✕</button>
             </div>
             <div class="modal-body" id="mergeResultsContent"></div>
             <div class="modal-footer">
-                <a href="components.html" class="btn btn-secondary">View Components</a>
+                <a href="components.html" class="btn btn-info">📦 View Components</a>
                 <button class="btn btn-primary" onclick="closeMergeResultsModal()">Done</button>
             </div>
         </div>
