@@ -8,21 +8,31 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="loader"><div class="spinner"></div></div>
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
 
+    <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <div class="logo"><div class="logo-icon">🔬</div>Throttle by RahulS</div>
+            <div class="logo">
+                <div class="logo-icon">🔬</div>
+                Throttle by RahulS
+            </div>
             <nav class="nav">
                 <a href="index.html" class="nav-link">Home</a>
                 <a href="projects.html" class="nav-link">Projects</a>
                 <a href="components.html" class="nav-link">Components</a>
                 <a href="competitions.html" class="nav-link">Competitions</a>
                 <a href="orders.html" class="nav-link active">Orders</a>
+                <div class="nav-divider"></div>
+                <button class="nav-link logout-btn" onclick="logout()">Logout</button>
             </nav>
         </div>
     </header>
 
+    <!-- Main Content -->
     <main class="container">
         <div class="page-header">
             <h1 class="page-title" id="formTitle">New Order</h1>
@@ -31,12 +41,16 @@
         <form id="orderForm" onsubmit="saveOrder(event)">
             <input type="hidden" id="orderId">
 
+            <!-- Order Info -->
             <div class="card">
-                <div class="card-header"><h3>📦 Order Details</h3></div>
+                <div class="card-header">
+                    <h3 class="card-title">📦 Order Information</h3>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Vendor <span class="required">*</span></label>
-                        <input type="text" id="vendor" class="form-control" required placeholder="Amazon, Robu.in...">
+                        <input type="text" id="vendor" class="form-control" required placeholder="Amazon, Robu.in, Electronicscomp...">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Status</label>
@@ -49,6 +63,7 @@
                         </select>
                     </div>
                 </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Order Date</label>
@@ -59,20 +74,22 @@
                         <input type="date" id="expectedDelivery" class="form-control">
                     </div>
                 </div>
+
                 <div class="form-group">
                     <label class="form-label">Notes</label>
-                    <textarea id="notes" class="form-control" rows="2" placeholder="Tracking info, notes..."></textarea>
+                    <textarea id="notes" class="form-control" rows="2" placeholder="Tracking info, special instructions..."></textarea>
                 </div>
             </div>
 
+            <!-- Order Items -->
             <div class="card">
                 <div class="card-header">
-                    <h3>📋 Order Items</h3>
+                    <h3 class="card-title">📋 Order Items</h3>
                 </div>
-                
+
                 <div class="add-item-form">
                     <div class="form-row">
-                        <div class="form-group" style="flex:2">
+                        <div class="form-group" style="flex: 2;">
                             <label class="form-label">Component Name</label>
                             <input type="text" id="itemName" class="form-control" placeholder="ESP32, Arduino Uno...">
                         </div>
@@ -80,24 +97,27 @@
                             <label class="form-label">Type</label>
                             <input type="text" id="itemType" class="form-control" placeholder="Microcontroller">
                         </div>
-                        <div class="form-group" style="flex:0.5">
+                        <div class="form-group" style="flex: 0.5;">
                             <label class="form-label">Qty</label>
                             <input type="number" id="itemQuantity" class="form-control" value="1" min="1">
                         </div>
-                        <div class="form-group" style="flex:0.3;align-self:flex-end">
+                        <div class="form-group" style="align-self: flex-end;">
                             <button type="button" class="btn btn-primary" onclick="addOrderItem()">➕ Add</button>
                         </div>
                     </div>
                 </div>
 
-                <div id="orderItemsContainer"></div>
+                <div id="orderItemsContainer">
+                    <div class="no-items">No items added yet. Add items above.</div>
+                </div>
 
                 <div class="order-totals">
-                    <span>Items: <strong id="totalItemsCount">0</strong></span>
-                    <span>Total Qty: <strong id="totalQuantityCount">0</strong></span>
+                    <span>Total Types: <strong id="totalItemsCount">0</strong></span>
+                    <span>Total Quantity: <strong id="totalQuantityCount">0</strong></span>
                 </div>
             </div>
 
+            <!-- Form Actions -->
             <div class="form-actions-fixed">
                 <button type="submit" class="btn btn-success btn-lg">💾 Save Order</button>
                 <a href="orders.html" class="btn btn-secondary btn-lg">❌ Cancel</a>
