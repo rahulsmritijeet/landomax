@@ -2,7 +2,6 @@
 // script.js - ATL Dashboard Complete
 // ALL MODULES INCLUDED
 // =====================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbyUlHYMRFkfWlhWbPy3W89_NYfxqvUTTTHE61XN9zzq84dbYB8mWFoVJ5Qr3TKiQVK_/exec';
 
 // =====================================================
 // API HELPER FUNCTIONS
