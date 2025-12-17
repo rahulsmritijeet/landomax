@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .loading { background: #fff3cd; color: #856404; }
+        pre { background: #f4f4f4; padding: 10px; overflow: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🧪 ATL Dashboard API Test</h1>
+    
+    <div>
+        <h3>API URL:</h3>
+        <input type="text" id="apiUrl" style="width: 100%; padding: 10px; font-size: 14px;" 
+            value="https://script.google.com/macros/s/AKfycbzHxXCYWTSP5IzF8uJLTjwnwRF-C_-DSd8b7K5idQsS6_18pnXeA8xtSzsV-MsCLcEP/exec">
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <button onclick="testAPI('test')">🧪 Test Connection</button>
+        <button onclick="testAPI('verifyPassword', '&password=admin123')">🔐 Test Login</button>
+        <button onclick="testAPI('getComponents')">⚙️ Get Components</button>
+        <button onclick="testAPI('getProjects')">📁 Get Projects</button>
+        <button onclick="testAPI('getCompetitions')">🏆 Get Competitions</button>
+        <button onclick="testAPI('getOrders')">📦 Get Orders</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        async function testAPI(action, extraParams = '') {
+            const resultsDiv = document.getElementById('results');
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            resultsDiv.innerHTML = `<div class="result loading">⏳ Testing ${action}...</div>`;
+            
+            const url = `${apiUrl}?action=${action}${extraParams}`;
+            console.log('Fetching:', url);
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(url);
+                const endTime = Date.now();
+                
+                console.log('Response status:', response.status);
+                
+                const text = await response.text();
+                console.log('Response text:', text);
+                
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    resultsDiv.innerHTML = `
+                        <div class="result error">
+                            <h4>❌ JSON Parse Error</h4>
+                            <p>Response is not valid JSON</p>
+                            <pre>${text.substring(0, 500)}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const isSuccess = data.success === true;
+                
+                resultsDiv.innerHTML = `
+                    <div class="result ${isSuccess ? 'success' : 'error'}">
+                        <h4>${isSuccess ? '✅ Success' : '❌ Failed'}: ${action}</h4>
+                        <p>Time: ${endTime - startTime}ms</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Fetch error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="result error">
+                        <h4>❌ Network Error</h4>
+                        <p>${error.message}</p>
+                        <p>This usually means:</p>
+                        <ul>
+                            <li>CORS issue - Deploy Apps Script as "Anyone can access"</li>
+                            <li>Network issue - Check internet connection</li>
+                            <li>Wrong URL - Verify the API URL is correct</li>
+                        </ul>
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = () => testAPI('test');
+    </script>
+</body>
+</html>
