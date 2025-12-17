@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders - ATL Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🔬</div>
+                ATL Dashboard
+            </div>
+            <nav class="nav">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="projects.html" class="nav-link">Projects</a>
+                <a href="components.html" class="nav-link">Components</a>
+                <a href="competitions.html" class="nav-link">Competitions</a>
+                <a href="orders.html" class="nav-link active">Orders</a>
+                <div class="nav-divider"></div>
+                <button class="nav-link logout-btn" onclick="logout()">🚪 Logout</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <div class="page-header">
+            <h1 class="page-title">📦 Orders</h1>
+            <div class="header-actions">
+                <input type="text" id="searchOrders" class="search-input" placeholder="🔍 Search orders..." oninput="searchOrders()">
+                <button class="btn btn-secondary" onclick="openImportOrderModal()">📥 Import Excel</button>
+                <a href="order_form.html" class="btn btn-primary">➕ New Order</a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📦</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalOrders">0</span>
+                    <span class="stat-label">Total Orders</span>
+                </div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">🕐</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="pendingOrders">0</span>
+                    <span class="stat-label">Ordered</span>
+                </div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-icon">🚚</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="shippedOrders">0</span>
+                    <span class="stat-label">Shipped</span>
+                </div>
+            </div>
+            <div class="stat-card primary">
+                <div class="stat-icon">📬</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="deliveredOrders">0</span>
+                    <span class="stat-label">Delivered</span>
+                </div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="completedOrders">0</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterOrders('all', this)">📋 All Orders</button>
+            <button class="filter-tab" onclick="filterOrders('Ordered', this)">🕐 Ordered</button>
+            <button class="filter-tab" onclick="filterOrders('Shipped', this)">🚚 Shipped</button>
+            <button class="filter-tab" onclick="filterOrders('Delivered', this)">📬 Delivered</button>
+            <button class="filter-tab" onclick="filterOrders('Completed', this)">✅ Completed</button>
+        </div>
+
+        <!-- Orders Container -->
+        <div id="ordersContainer">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading orders...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Import Order Modal -->
+    <div class="modal" id="importOrderModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>📥 Import Order from Excel</h3>
+                <button class="modal-close" onclick="closeImportOrderModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-instructions">
+                    <h4>📋 How to Import:</h4>
+                    <ol>
+                        <li>Excel columns: <code>ComponentName</code>, <code>Quantity</code>, <code>Type</code> (optional)</li>
+                        <li>Save as <strong>.xlsx</strong> or <strong>.csv</strong></li>
+                    </ol>
+                    <button class="btn btn-secondary btn-sm" onclick="downloadOrderTemplate()">📄 Download Template</button>
+                </div>
+
+                <div class="file-upload-zone" id="orderDropZone">
+                    <input type="file" id="orderFileInput" accept=".xlsx,.xls,.csv" onchange="handleOrderFile(this.files[0])" hidden>
+                    <div class="upload-icon">📁</div>
+                    <p>Drag & drop your Excel file here</p>
+                    <p class="or-text">or</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('orderFileInput').click()">📂 Browse Files</button>
+                </div>
+
+                <div id="orderPreviewSection" style="display: none;">
+                    <h4>📦 Order Details</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Vendor Name</label>
+                            <input type="text" id="importVendor" class="form-control" placeholder="Amazon, Robu.in...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Order Date</label>
+                            <input type="date" id="importOrderDate" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Expected Delivery</label>
+                            <input type="date" id="importExpectedDelivery" class="form-control">
+                        </div>
+                    </div>
+                    <h4>📋 Items Preview</h4>
+                    <div id="orderItemsPreview"></div>
+                    <div class="preview-stats">
+                        <span>Total Items: <strong id="previewTotalItems">0</strong></span>
+                        <span>Total Quantity: <strong id="previewTotalQty">0</strong></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" id="confirmOrderImportBtn" onclick="confirmOrderImport()" disabled>✅ Create Order</button>
+                <button class="btn btn-secondary" onclick="closeImportOrderModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Order Modal -->
+    <div class="modal" id="viewOrderModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 id="viewOrderTitle">Order Details</h3>
+                <button class="modal-close" onclick="closeViewOrderModal()">✕</button>
+            </div>
+            <div class="modal-body" id="viewOrderBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="viewOrderEditBtn">✏️ Edit</button>
+                <button class="btn btn-secondary" onclick="closeViewOrderModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Order Modal -->
+    <div class="modal" id="completeOrderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✅ Complete Order & Merge Inventory</h3>
+                <button class="modal-close" onclick="closeCompleteOrderModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="completeOrderSummary"></div>
+                <div class="merge-explanation">
+                    <h4>🔄 What will happen:</h4>
+                    <ul>
+                        <li>✅ Existing components → quantity increased</li>
+                        <li>➕ New components → added to inventory</li>
+                        <li>🧠 Smart matching: "ESP 32" = "esp32" = "ESP32"</li>
+                        <li>📝 Order status → Completed</li>
+                    </ul>
+                </div>
+                <div class="warning-box">
+                    <strong>⚠️ Note:</strong> This action cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success btn-lg" onclick="confirmCompleteOrder()">✅ Complete & Merge</button>
+                <button class="btn btn-secondary" onclick="closeCompleteOrderModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Merge Results Modal -->
+    <div class="modal" id="mergeResultsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎉 Order Completed!</h3>
+                <button class="modal-close" onclick="closeMergeResultsModal()">✕</button>
+            </div>
+            <div class="modal-body" id="mergeResultsContent"></div>
+            <div class="modal-footer">
+                <a href="components.html" class="btn btn-secondary">View Components</a>
+                <button class="btn btn-primary" onclick="closeMergeResultsModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/script.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof checkAuth === 'function' && !checkAuth()) return;
+            loadOrders();
+            setupOrderDropZone();
+        });
+    </script>
+</body>
+</html>
