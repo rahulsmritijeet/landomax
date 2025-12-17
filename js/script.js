@@ -1068,7 +1068,7 @@ async function saveCompetition(event) {
 }
 
 // =====================================================
-// ORDERS MODULE
+// ORDERS MODULE - COMPLETE WITH SMART MATCHING
 // =====================================================
 
 let allOrders = [];
@@ -1084,31 +1084,60 @@ async function loadOrders() {
         allOrders = result.data || [];
         updateOrderStats();
         renderOrdersList(allOrders);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e);
+        const container = document.getElementById('ordersContainer');
+        if (container) {
+            container.innerHTML = `<div class="empty-state"><h3>Failed to load orders</h3>
+                <button onclick="loadOrders()" class="btn btn-primary">🔄 Retry</button></div>`;
+        }
+    }
     hideLoading();
 }
 
 function updateOrderStats() {
-    if (document.getElementById('totalOrders')) document.getElementById('totalOrders').textContent = allOrders.length;
-    if (document.getElementById('pendingOrders')) document.getElementById('pendingOrders').textContent = allOrders.filter(o => o.Status === 'Ordered').length;
-    if (document.getElementById('shippedOrders')) document.getElementById('shippedOrders').textContent = allOrders.filter(o => o.Status === 'Shipped').length;
-    if (document.getElementById('deliveredOrders')) document.getElementById('deliveredOrders').textContent = allOrders.filter(o => o.Status === 'Delivered').length;
-    if (document.getElementById('completedOrders')) document.getElementById('completedOrders').textContent = allOrders.filter(o => o.Status === 'Completed').length;
+    const total = allOrders.length;
+    const pending = allOrders.filter(o => o.Status === 'Ordered').length;
+    const shipped = allOrders.filter(o => o.Status === 'Shipped').length;
+    const completed = allOrders.filter(o => o.Status === 'Completed' || o.Status === 'Delivered').length;
+    
+    if (document.getElementById('totalOrders')) document.getElementById('totalOrders').textContent = total;
+    if (document.getElementById('pendingOrders')) document.getElementById('pendingOrders').textContent = pending;
+    if (document.getElementById('shippedOrders')) document.getElementById('shippedOrders').textContent = shipped;
+    if (document.getElementById('completedOrders')) document.getElementById('completedOrders').textContent = completed;
 }
 
 function filterOrders(status, btn) {
     currentOrderFilter = status;
     document.querySelectorAll('.filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
     if (btn) btn.classList.add('active');
-    renderOrdersList(status === 'all' ? allOrders : allOrders.filter(o => o.Status === status));
+    
+    let filtered = allOrders;
+    if (status !== 'all') {
+        if (status === 'Completed') {
+            // Include both Completed and Delivered
+            filtered = allOrders.filter(o => o.Status === 'Completed' || o.Status === 'Delivered');
+        } else {
+            filtered = allOrders.filter(o => o.Status === status);
+        }
+    }
+    renderOrdersList(filtered);
 }
 
 function searchOrders() {
     const q = (document.getElementById('searchOrders')?.value || '').toLowerCase();
     let filtered = allOrders.filter(o => 
-        (o.OrderID||'').toLowerCase().includes(q) || (o.Vendor||'').toLowerCase().includes(q)
+        (o.OrderID||'').toLowerCase().includes(q) || 
+        (o.Vendor||'').toLowerCase().includes(q) ||
+        (o.Notes||'').toLowerCase().includes(q)
     );
-    if (currentOrderFilter !== 'all') filtered = filtered.filter(o => o.Status === currentOrderFilter);
+    if (currentOrderFilter !== 'all') {
+        if (currentOrderFilter === 'Completed') {
+            filtered = filtered.filter(o => o.Status === 'Completed' || o.Status === 'Delivered');
+        } else {
+            filtered = filtered.filter(o => o.Status === currentOrderFilter);
+        }
+    }
     renderOrdersList(filtered);
 }
 
@@ -1117,9 +1146,16 @@ function renderOrdersList(orders) {
     if (!container) return;
     
     if (!orders?.length) {
-        container.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><h3>No Orders</h3>
-            <div class="empty-actions"><a href="order_form.html" class="btn btn-primary">➕ Create Order</a>
-            <button class="btn btn-secondary" onclick="openImportOrderModal()">📥 Import</button></div></div>`;
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📦</div>
+                <h3>No Orders Found</h3>
+                <p>Create a new order or import from Excel</p>
+                <div class="empty-actions">
+                    <a href="order_form.html" class="btn btn-primary">➕ Create Order</a>
+                    <button class="btn btn-secondary" onclick="openImportOrderModal()">📥 Import Excel</button>
+                </div>
+            </div>`;
         return;
     }
     
@@ -1129,31 +1165,71 @@ function renderOrdersList(orders) {
 function createOrderCard(order) {
     const items = order.Items || [];
     const totalQty = parseInt(order.TotalQuantity) || items.reduce((s,i) => s + (parseInt(i.Quantity)||0), 0);
-    const statusIcons = { 'ordered':'🕐', 'shipped':'🚚', 'delivered':'📬', 'completed':'✅', 'cancelled':'❌' };
+    const statusIcons = { 
+        'ordered':'🕐', 
+        'shipped':'🚚', 
+        'delivered':'✅', 
+        'completed':'✅', 
+        'cancelled':'❌' 
+    };
     const statusClass = (order.Status||'ordered').toLowerCase();
+    const isCompleted = order.Status === 'Completed' || order.Status === 'Delivered';
     
     return `
-        <div class="order-card ${order.Status === 'Completed' ? 'completed' : ''}">
+        <div class="order-card ${isCompleted ? 'completed' : ''}">
             <div class="order-card-header">
                 <div class="order-info">
                     <code class="order-id">${order.OrderID}</code>
-                    <span class="order-vendor">${escapeHtml(order.Vendor)||'Unknown'}</span>
+                    <span class="order-vendor">${escapeHtml(order.Vendor)||'Unknown Vendor'}</span>
                 </div>
                 <span class="status-badge status-${statusClass}">${statusIcons[statusClass]||'📦'} ${order.Status||'Ordered'}</span>
             </div>
+            
             <div class="order-card-meta">
-                <div class="meta-item"><span class="meta-label">📅 Ordered</span><span class="meta-value">${formatDate(order.OrderDate)||'N/A'}</span></div>
-                <div class="meta-item"><span class="meta-label">🚚 Expected</span><span class="meta-value">${formatDate(order.ExpectedDelivery)||'TBD'}</span></div>
-                <div class="meta-item"><span class="meta-label">📦 Items</span><span class="meta-value">${items.length} types, ${totalQty} units</span></div>
+                <div class="meta-item">
+                    <span class="meta-label">📅 Ordered</span>
+                    <span class="meta-value">${formatDate(order.OrderDate)||'N/A'}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">🚚 Expected</span>
+                    <span class="meta-value">${formatDate(order.ExpectedDelivery)||'TBD'}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">📦 Items</span>
+                    <span class="meta-value">${items.length} types, ${totalQty} units</span>
+                </div>
             </div>
-            ${items.length ? `<div class="order-items-preview"><h5>Items</h5>${items.slice(0,3).map(i => 
-                `<div class="order-item-row"><span class="item-name">${escapeHtml(i.ComponentName)}</span><span><span class="item-qty">×${i.Quantity}</span>${i.Synced==='Yes'?'<span class="synced-badge">✓</span>':''}</span></div>`
-            ).join('')}${items.length > 3 ? `<div class="more-items">+${items.length-3} more</div>` : ''}</div>` : ''}
+            
+            ${items.length ? `
+                <div class="order-items-preview">
+                    <h5>Items</h5>
+                    ${items.slice(0,4).map((item, index) => `
+                        <div class="order-item-row">
+                            <span class="item-sno">${index + 1}.</span>
+                            <span class="item-name">${escapeHtml(item.ComponentName)}</span>
+                            <span>
+                                <span class="item-qty">×${item.Quantity}</span>
+                                ${item.Synced==='Yes'?'<span class="synced-badge">✓ Added</span>':''}
+                            </span>
+                        </div>
+                    `).join('')}
+                    ${items.length > 4 ? `<div class="more-items">+${items.length-4} more items</div>` : ''}
+                </div>
+            ` : ''}
+            
             <div class="order-card-actions">
-                ${order.Status === 'Delivered' ? `<button class="btn btn-success" onclick="openCompleteOrderModal('${order.OrderID}')">✅ Complete & Merge</button>` : ''}
-                <button class="btn btn-sm btn-info" onclick="viewOrder('${order.OrderID}')">👁️</button>
-                ${order.Status !== 'Completed' ? `<button class="btn btn-sm btn-primary" onclick="editOrder('${order.OrderID}')">✏️</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.OrderID}')">🗑️</button>` : ''}
+                ${!isCompleted ? `
+                    <button class="btn btn-success" onclick="openCompleteOrderModal('${order.OrderID}')">
+                        ✅ Complete & Add to Inventory
+                    </button>
+                ` : `
+                    <span class="completed-badge">✅ Added to Inventory</span>
+                `}
+                <button class="btn btn-sm btn-info" onclick="viewOrder('${order.OrderID}')">👁️ View</button>
+                ${!isCompleted ? `
+                    <button class="btn btn-sm btn-primary" onclick="editOrder('${order.OrderID}')">✏️ Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.OrderID}')">🗑️</button>
+                ` : ''}
             </div>
         </div>`;
 }
@@ -1162,6 +1238,7 @@ function viewOrder(orderId) {
     const order = allOrders.find(o => o.OrderID === orderId);
     if (!order) return;
     const items = order.Items || [];
+    const isCompleted = order.Status === 'Completed' || order.Status === 'Delivered';
     
     document.getElementById('viewOrderTitle').textContent = `Order: ${order.OrderID}`;
     document.getElementById('viewOrderBody').innerHTML = `
@@ -1171,12 +1248,40 @@ function viewOrder(orderId) {
             <div class="detail-item"><label>Order Date</label><span>${formatDate(order.OrderDate)||'N/A'}</span></div>
             <div class="detail-item"><label>Expected</label><span>${formatDate(order.ExpectedDelivery)||'TBD'}</span></div>
         </div>
+        
         <h4>📋 Items (${items.length})</h4>
-        ${items.length ? `<table class="order-items-table"><thead><tr><th>Component</th><th>Type</th><th>Qty</th><th>Synced</th></tr></thead>
-        <tbody>${items.map(i => `<tr><td>${escapeHtml(i.ComponentName)}</td><td>${escapeHtml(i.Type)||'-'}</td><td>${i.Quantity}</td><td>${i.Synced==='Yes'?'✅':'❌'}</td></tr>`).join('')}</tbody></table>` : '<p>No items</p>'}
+        ${items.length ? `
+            <table class="order-items-table">
+                <thead><tr><th>S.No</th><th>Component</th><th>Type</th><th>Qty</th><th>Status</th></tr></thead>
+                <tbody>${items.map((item, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${escapeHtml(item.ComponentName)}</strong></td>
+                        <td>${escapeHtml(item.Type)||'-'}</td>
+                        <td>${item.Quantity}</td>
+                        <td>${item.Synced==='Yes'?'<span class="synced-badge">✅ Added</span>':'<span class="pending-badge">⏳ Pending</span>'}</td>
+                    </tr>
+                `).join('')}</tbody>
+            </table>
+        ` : '<p>No items in this order</p>'}
+        
         ${order.Notes ? `<h4>📝 Notes</h4><p>${escapeHtml(order.Notes)}</p>` : ''}
+        
+        ${isCompleted ? `
+            <div class="completed-info">
+                <p>✅ This order has been completed and all items have been added to your components inventory.</p>
+            </div>
+        ` : ''}
     `;
-    document.getElementById('viewOrderEditBtn').onclick = () => { closeViewOrderModal(); editOrder(orderId); };
+    
+    const editBtn = document.getElementById('viewOrderEditBtn');
+    if (isCompleted) {
+        editBtn.style.display = 'none';
+    } else {
+        editBtn.style.display = 'inline-flex';
+        editBtn.onclick = () => { closeViewOrderModal(); editOrder(orderId); };
+    }
+    
     document.getElementById('viewOrderModal').classList.add('show');
 }
 
@@ -1189,7 +1294,7 @@ function editOrder(id) {
 }
 
 async function deleteOrder(id) {
-    if (!confirm('Delete this order?')) return;
+    if (!confirm('Delete this order? This cannot be undone.')) return;
     showLoading();
     try { 
         await apiCall('deleteOrder', { id }); 
@@ -1205,11 +1310,29 @@ function openCompleteOrderModal(orderId) {
     const order = allOrders.find(o => o.OrderID === orderId);
     if (!order) return;
     const items = order.Items || [];
+    const totalQty = items.reduce((s,i) => s + (parseInt(i.Quantity)||0), 0);
     
     document.getElementById('completeOrderSummary').innerHTML = `
-        <p><strong>Order:</strong> ${order.OrderID} | <strong>Vendor:</strong> ${escapeHtml(order.Vendor)}</p>
-        <h5>Items to merge into inventory:</h5>
-        <ul>${items.map(i => `<li>${escapeHtml(i.ComponentName)} <strong>+${i.Quantity}</strong></li>`).join('')}</ul>
+        <div class="order-summary-box">
+            <div class="summary-header">
+                <strong>Order:</strong> ${order.OrderID}<br>
+                <strong>Vendor:</strong> ${escapeHtml(order.Vendor)}
+            </div>
+            <h5>📦 Items to be added to inventory (${items.length} types, ${totalQty} units):</h5>
+            <div class="items-to-add">
+                <table class="mini-table">
+                    <thead><tr><th>S.No</th><th>Component</th><th>Type</th><th>Qty</th></tr></thead>
+                    <tbody>${items.map((item, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${escapeHtml(item.ComponentName)}</td>
+                            <td>${escapeHtml(item.Type)||'-'}</td>
+                            <td><strong>+${item.Quantity}</strong></td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>
+            </div>
+        </div>
     `;
     document.getElementById('completeOrderModal').classList.add('show');
 }
@@ -1221,36 +1344,81 @@ function closeCompleteOrderModal() {
 
 async function confirmCompleteOrder() {
     if (!currentCompleteOrderId) return;
+    
     showLoading();
     closeCompleteOrderModal();
     
     try {
         const result = await apiCall('completeOrder', { id: currentCompleteOrderId });
+        
         if (result.success) {
             showMergeResults(result);
+            loadOrders();
+        } else {
+            showNotification(result.error || 'Failed to complete order', 'error');
         }
-        loadOrders();
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e);
+        showNotification('Error completing order', 'error');
+    }
     hideLoading();
 }
 
 function showMergeResults(result) {
     const syncResults = result.syncResults || [];
-    const merged = syncResults.filter(r => r.action === 'updated' || r.action === 'merged');
+    const merged = syncResults.filter(r => r.action === 'merged');
     const created = syncResults.filter(r => r.action === 'created');
     
     document.getElementById('mergeResultsContent').innerHTML = `
         <div class="merge-results">
             <div class="merge-summary">
-                <div class="summary-item success"><span class="summary-number">${merged.length}</span><span class="summary-label">Updated</span></div>
-                <div class="summary-item info"><span class="summary-number">${created.length}</span><span class="summary-label">Created</span></div>
+                <div class="summary-item success">
+                    <span class="summary-number">${merged.length}</span>
+                    <span class="summary-label">Existing Updated</span>
+                </div>
+                <div class="summary-item info">
+                    <span class="summary-number">${created.length}</span>
+                    <span class="summary-label">New Created</span>
+                </div>
             </div>
-            ${merged.length ? `<div class="result-section"><h5>🔄 Updated Components</h5><ul>${merged.map(r => 
-                `<li><span>${escapeHtml(r.matchedWith || r.name || r.itemName)}</span> <span>${r.previousQty || 0} → <strong>${r.newQty}</strong> (+${r.addedQty || r.added || r.quantity})</span></li>`
-            ).join('')}</ul></div>` : ''}
-            ${created.length ? `<div class="result-section"><h5>➕ New Components</h5><ul>${created.map(r => 
-                `<li><span>${escapeHtml(r.itemName || r.name)}</span> <strong>+${r.quantity}</strong></li>`
-            ).join('')}</ul></div>` : ''}
+            
+            ${merged.length ? `
+                <div class="result-section">
+                    <h5>🔄 Updated Existing Components</h5>
+                    <p class="result-note">These components were found in your inventory. Quantities were added.</p>
+                    <table class="results-table">
+                        <thead><tr><th>Component</th><th>Previous</th><th>Added</th><th>New Total</th></tr></thead>
+                        <tbody>${merged.map(r => `
+                            <tr>
+                                <td><strong>${escapeHtml(r.matchedWith || r.itemName)}</strong></td>
+                                <td>${r.previousQty}</td>
+                                <td class="added-qty">+${r.addedQty}</td>
+                                <td class="new-qty"><strong>${r.newQty}</strong></td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>
+                </div>
+            ` : ''}
+            
+            ${created.length ? `
+                <div class="result-section">
+                    <h5>🆕 New Components Created</h5>
+                    <p class="result-note">These components were not found in your inventory. New entries were created.</p>
+                    <table class="results-table">
+                        <thead><tr><th>Component</th><th>Quantity</th></tr></thead>
+                        <tbody>${created.map(r => `
+                            <tr>
+                                <td><strong>${escapeHtml(r.itemName || r.componentName)}</strong></td>
+                                <td class="new-qty"><strong>${r.addedQty || r.newQty}</strong></td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>
+                </div>
+            ` : ''}
+            
+            <div class="success-message">
+                <p>✅ All items have been successfully added to your components inventory!</p>
+            </div>
         </div>
     `;
     document.getElementById('mergeResultsModal').classList.add('show');
@@ -1260,7 +1428,7 @@ function closeMergeResultsModal() {
     document.getElementById('mergeResultsModal').classList.remove('show'); 
 }
 
-// Import Order Modal
+// Import Order from Excel
 function openImportOrderModal() {
     document.getElementById('importOrderModal').classList.add('show');
     orderImportData = [];
@@ -1279,8 +1447,16 @@ function closeImportOrderModal() {
 function setupOrderDropZone() {
     const dz = document.getElementById('orderDropZone');
     if (!dz) return;
-    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    
+    dz.addEventListener('dragover', e => { 
+        e.preventDefault(); 
+        dz.classList.add('dragover'); 
+    });
+    
+    dz.addEventListener('dragleave', () => {
+        dz.classList.remove('dragover');
+    });
+    
     dz.addEventListener('drop', e => { 
         e.preventDefault(); 
         dz.classList.remove('dragover'); 
@@ -1289,31 +1465,83 @@ function setupOrderDropZone() {
 }
 
 function handleOrderFile(file) {
+    if (!file) return;
+    
+    showNotification('Reading file...', 'info');
+    
     const reader = new FileReader();
     reader.onload = e => {
         try {
             const wb = XLSX.read(e.target.result, {type:'binary'});
-            orderImportData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const sheetName = wb.SheetNames[0];
+            orderImportData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+            
+            if (orderImportData.length === 0) {
+                showNotification('No data found in the file', 'error');
+                return;
+            }
+            
             showOrderPreview(orderImportData);
-        } catch (err) { showNotification('Error reading file', 'error'); }
+            showNotification(`Found ${orderImportData.length} items`, 'success');
+        } catch (err) { 
+            console.error(err);
+            showNotification('Error reading file: ' + err.message, 'error'); 
+        }
+    };
+    reader.onerror = () => {
+        showNotification('Error reading file', 'error');
     };
     reader.readAsBinaryString(file);
 }
 
 function showOrderPreview(data) {
-    if (!data?.length) { showNotification('No data found', 'error'); return; }
+    if (!data?.length) { 
+        showNotification('No data found', 'error'); 
+        return; 
+    }
     
-    const totalQty = data.reduce((s, i) => s + (parseInt(i.Quantity || i.quantity) || 0), 0);
+    // Calculate totals
+    const totalQty = data.reduce((s, item) => {
+        return s + (parseInt(item.Quantity || item.quantity || item.Qty || 0));
+    }, 0);
     
+    // Build preview table
     document.getElementById('orderItemsPreview').innerHTML = `
         <table class="preview-table">
-            <thead><tr><th>Component</th><th>Type</th><th>Qty</th></tr></thead>
-            <tbody>${data.slice(0, 10).map(i => `<tr>
-                <td>${escapeHtml(i.ComponentName || i.Name || i.name || '')}</td>
-                <td>${escapeHtml(i.Type || i.type || '')}</td>
-                <td>${i.Quantity || i.quantity || 0}</td>
-            </tr>`).join('')}${data.length > 10 ? `<tr><td colspan="3" style="text-align:center;font-style:italic;">...and ${data.length - 10} more</td></tr>` : ''}</tbody>
-        </table>`;
+            <thead>
+                <tr>
+                    <th>S.No</th>
+                    <th>Component Name</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.slice(0, 15).map((item, index) => {
+                    const sno = item['S.No'] || item['SNo'] || item['Sno'] || item['s.no'] || item['sno'] || (index + 1);
+                    const name = item.ComponentName || item.Name || item.name || item['Component Name'] || '';
+                    const type = item.Type || item.type || '';
+                    const qty = item.Quantity || item.quantity || item.Qty || item.qty || 0;
+                    
+                    return `
+                        <tr>
+                            <td>${sno}</td>
+                            <td><strong>${escapeHtml(name)}</strong></td>
+                            <td>${escapeHtml(type)}</td>
+                            <td>${qty}</td>
+                        </tr>
+                    `;
+                }).join('')}
+                ${data.length > 15 ? `
+                    <tr>
+                        <td colspan="4" style="text-align:center;font-style:italic;color:#666;">
+                            ... and ${data.length - 15} more items
+                        </td>
+                    </tr>
+                ` : ''}
+            </tbody>
+        </table>
+    `;
     
     document.getElementById('previewTotalItems').textContent = data.length;
     document.getElementById('previewTotalQty').textContent = totalQty;
@@ -1323,49 +1551,98 @@ function showOrderPreview(data) {
 
 function downloadOrderTemplate() {
     const template = [
-        { ComponentName: 'Arduino Uno', Type: 'Microcontroller', Quantity: 5 },
-        { ComponentName: 'ESP32', Type: 'Microcontroller', Quantity: 10 },
-        { ComponentName: 'Ultrasonic Sensor', Type: 'Sensor', Quantity: 8 }
+        { 'S.No': 1, ComponentName: 'Arduino Uno R3', Type: 'Microcontroller', Quantity: 5 },
+        { 'S.No': 2, ComponentName: 'ESP32 DevKit', Type: 'Microcontroller', Quantity: 10 },
+        { 'S.No': 3, ComponentName: 'HC-SR04 Ultrasonic Sensor', Type: 'Sensor', Quantity: 8 },
+        { 'S.No': 4, ComponentName: 'SG90 Servo Motor', Type: 'Motor', Quantity: 6 },
+        { 'S.No': 5, ComponentName: 'DHT11 Temperature Sensor', Type: 'Sensor', Quantity: 5 },
+        { 'S.No': 6, ComponentName: 'LED 5mm Red', Type: 'LED', Quantity: 50 },
+        { 'S.No': 7, ComponentName: 'Jumper Wires M-M', Type: 'Wire', Quantity: 100 },
+        { 'S.No': 8, ComponentName: '16x2 LCD Display', Type: 'Display', Quantity: 4 }
     ];
+    
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Order');
-    XLSX.writeFile(wb, 'Order_Template.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Order Items');
+    
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 6 },   // S.No
+        { wch: 30 },  // ComponentName
+        { wch: 15 },  // Type
+        { wch: 10 }   // Quantity
+    ];
+    
+    XLSX.writeFile(wb, 'Order_Import_Template.xlsx');
     showNotification('Template downloaded!');
 }
 
 async function confirmOrderImport() {
-    if (!orderImportData?.length) return;
+    if (!orderImportData?.length) {
+        showNotification('No items to import', 'warning');
+        return;
+    }
+    
+    const vendor = document.getElementById('importVendor')?.value?.trim();
+    if (!vendor) {
+        showNotification('Please enter vendor name', 'warning');
+        document.getElementById('importVendor').focus();
+        return;
+    }
     
     showLoading();
+    
     try {
+        // Process the imported data
+        const items = orderImportData.map((item, index) => ({
+            ComponentName: item.ComponentName || item.Name || item.name || item['Component Name'] || '',
+            Type: item.Type || item.type || '',
+            Quantity: parseInt(item.Quantity || item.quantity || item.Qty || item.qty) || 1
+        })).filter(item => item.ComponentName); // Remove items without names
+        
+        if (items.length === 0) {
+            showNotification('No valid items found in the file', 'error');
+            hideLoading();
+            return;
+        }
+        
         const orderData = {
-            Vendor: document.getElementById('importVendor')?.value || 'Imported Order',
+            Vendor: vendor,
             OrderDate: document.getElementById('importOrderDate')?.value || new Date().toISOString().split('T')[0],
             ExpectedDelivery: document.getElementById('importExpectedDelivery')?.value || '',
             Status: 'Ordered',
-            Notes: 'Imported from Excel',
-            Items: orderImportData.map(i => ({
-                ComponentName: i.ComponentName || i.Name || i.name || '',
-                Type: i.Type || i.type || '',
-                Quantity: parseInt(i.Quantity || i.quantity) || 0
-            }))
+            Notes: `Imported from Excel (${items.length} items)`,
+            Items: items
         };
         
-        await apiCall('addOrder', { data: orderData });
-        showNotification('Order imported successfully!');
-        closeImportOrderModal();
-        loadOrders();
-    } catch (e) { console.error(e); }
+        const result = await apiCall('addOrder', { data: orderData });
+        
+        if (result.success) {
+            showNotification(`Order created with ${items.length} items!`);
+            closeImportOrderModal();
+            loadOrders();
+        } else {
+            showNotification(result.error || 'Failed to create order', 'error');
+        }
+        
+    } catch (e) { 
+        console.error(e);
+        showNotification('Error importing order', 'error');
+    }
     hideLoading();
 }
 
-// Order Form
+// Order Form Functions
 async function loadOrderForm() {
     const orderId = getUrlParam('id');
     orderItems = [];
     
-    document.getElementById('orderDate').valueAsDate = new Date();
+    // Set default date
+    const orderDateInput = document.getElementById('orderDate');
+    if (orderDateInput) orderDateInput.valueAsDate = new Date();
+    
+    // Update S.No display
+    updateNextSno();
     
     if (orderId) {
         document.getElementById('formTitle').textContent = 'Edit Order';
@@ -1381,10 +1658,11 @@ async function loadOrderForm() {
                 document.getElementById('status').value = order.Status || 'Ordered';
                 document.getElementById('notes').value = order.Notes || '';
                 
-                orderItems = (order.Items || []).map(i => ({
-                    ComponentName: i.ComponentName,
-                    Type: i.Type || '',
-                    Quantity: parseInt(i.Quantity) || 0
+                orderItems = (order.Items || []).map((item, index) => ({
+                    sno: index + 1,
+                    ComponentName: item.ComponentName,
+                    Type: item.Type || '',
+                    Quantity: parseInt(item.Quantity) || 1
                 }));
             }
         } catch (e) { console.error(e); }
@@ -1394,36 +1672,57 @@ async function loadOrderForm() {
     renderOrderItems();
 }
 
+function updateNextSno() {
+    const snoInput = document.getElementById('itemSno');
+    if (snoInput) {
+        snoInput.value = orderItems.length + 1;
+    }
+}
+
 function addOrderItem() {
     const nameInput = document.getElementById('itemName');
     const typeInput = document.getElementById('itemType');
     const qtyInput = document.getElementById('itemQuantity');
     
     const name = nameInput?.value.trim();
-    const type = typeInput?.value.trim() || '';
+    const type = typeInput?.value || '';
     const qty = parseInt(qtyInput?.value) || 1;
     
     if (!name) { 
         showNotification('Enter component name', 'warning'); 
+        nameInput?.focus();
         return; 
     }
     
-    orderItems.push({ ComponentName: name, Type: type, Quantity: qty });
+    orderItems.push({ 
+        sno: orderItems.length + 1,
+        ComponentName: name, 
+        Type: type, 
+        Quantity: qty 
+    });
+    
     renderOrderItems();
     
+    // Clear inputs
     if (nameInput) nameInput.value = '';
     if (typeInput) typeInput.value = '';
     if (qtyInput) qtyInput.value = '1';
     nameInput?.focus();
+    
+    updateNextSno();
+    showNotification(`Added: ${name}`);
 }
 
 function removeOrderItem(index) {
     orderItems.splice(index, 1);
+    // Re-number items
+    orderItems.forEach((item, i) => item.sno = i + 1);
     renderOrderItems();
+    updateNextSno();
 }
 
 function updateItemQty(index, value) {
-    orderItems[index].Quantity = parseInt(value) || 1;
+    orderItems[index].Quantity = Math.max(1, parseInt(value) || 1);
     updateOrderTotals();
 }
 
@@ -1439,16 +1738,33 @@ function renderOrderItems() {
     
     container.innerHTML = `
         <table class="order-items-table">
-            <thead><tr><th>Component</th><th>Type</th><th>Qty</th><th></th></tr></thead>
-            <tbody>${orderItems.map((item, i) => `
+            <thead>
                 <tr>
-                    <td><strong>${escapeHtml(item.ComponentName)}</strong></td>
-                    <td>${escapeHtml(item.Type) || '-'}</td>
-                    <td><input type="number" class="qty-input-sm" value="${item.Quantity}" min="1" onchange="updateItemQty(${i}, this.value)"></td>
-                    <td><button type="button" class="btn btn-sm btn-danger" onclick="removeOrderItem(${i})">✕</button></td>
+                    <th style="width:60px">S.No</th>
+                    <th>Component</th>
+                    <th style="width:120px">Type</th>
+                    <th style="width:80px">Qty</th>
+                    <th style="width:60px"></th>
                 </tr>
-            `).join('')}</tbody>
-        </table>`;
+            </thead>
+            <tbody>
+                ${orderItems.map((item, i) => `
+                    <tr>
+                        <td><strong>${item.sno}</strong></td>
+                        <td><strong>${escapeHtml(item.ComponentName)}</strong></td>
+                        <td>${escapeHtml(item.Type) || '-'}</td>
+                        <td>
+                            <input type="number" class="qty-input-sm" value="${item.Quantity}" 
+                                   min="1" onchange="updateItemQty(${i}, this.value)">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removeOrderItem(${i})">✕</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
     
     updateOrderTotals();
 }
@@ -1456,8 +1772,12 @@ function renderOrderItems() {
 function updateOrderTotals() {
     const totalItems = orderItems.length;
     const totalQty = orderItems.reduce((s, i) => s + (parseInt(i.Quantity) || 0), 0);
-    if (document.getElementById('totalItemsCount')) document.getElementById('totalItemsCount').textContent = totalItems;
-    if (document.getElementById('totalQuantityCount')) document.getElementById('totalQuantityCount').textContent = totalQty;
+    
+    const itemsCountEl = document.getElementById('totalItemsCount');
+    const qtyCountEl = document.getElementById('totalQuantityCount');
+    
+    if (itemsCountEl) itemsCountEl.textContent = totalItems;
+    if (qtyCountEl) qtyCountEl.textContent = totalQty;
 }
 
 async function saveOrder(event) {
@@ -1468,30 +1788,68 @@ async function saveOrder(event) {
         return; 
     }
     
+    const vendor = document.getElementById('vendor').value.trim();
+    if (!vendor) {
+        showNotification('Enter vendor name', 'warning');
+        document.getElementById('vendor').focus();
+        return;
+    }
+    
+    const status = document.getElementById('status').value;
+    
     const data = {
-        Vendor: document.getElementById('vendor').value,
+        Vendor: vendor,
         OrderDate: document.getElementById('orderDate').value,
         ExpectedDelivery: document.getElementById('expectedDelivery').value,
-        Status: document.getElementById('status').value,
+        Status: status,
         Notes: document.getElementById('notes').value,
-        Items: orderItems
+        Items: orderItems.map(item => ({
+            ComponentName: item.ComponentName,
+            Type: item.Type,
+            Quantity: item.Quantity
+        }))
     };
     
     showLoading();
+    
     try {
         const orderId = document.getElementById('orderId').value;
+        let result;
+        
         if (orderId) {
-            await apiCall('updateOrder', { id: orderId, data });
-            showNotification('Order updated!');
+            result = await apiCall('updateOrder', { id: orderId, data });
+            
+            // If status changed to Completed, sync inventory
+            if (status === 'Completed') {
+                const syncResult = await apiCall('completeOrder', { id: orderId });
+                if (syncResult.success) {
+                    showNotification('Order updated and items added to inventory!');
+                }
+            } else {
+                showNotification('Order updated!');
+            }
         } else {
-            await apiCall('addOrder', { data });
-            showNotification('Order created!');
+            result = await apiCall('addOrder', { data });
+            
+            // If created as Completed, sync inventory
+            if (status === 'Completed' && result.id) {
+                const syncResult = await apiCall('completeOrder', { id: result.id });
+                if (syncResult.success) {
+                    showNotification('Order created and items added to inventory!');
+                }
+            } else {
+                showNotification('Order created!');
+            }
         }
+        
         window.location.href = 'orders.html';
-    } catch (e) { console.error(e); }
+        
+    } catch (e) { 
+        console.error(e);
+        showNotification('Error saving order', 'error');
+    }
     hideLoading();
 }
-
 // =====================================================
 // INITIALIZATION
 // =====================================================
