@@ -1214,17 +1214,36 @@ function closeCompleteOrderModal() {
     currentCompleteOrderId = null;
 }
 
-async function confirmCompleteOrder() {
-    if (!currentCompleteOrderId) return;
+// This replaces your old confirmCompleteOrder
+async function confirmCompleteOrder(orderIdFromButton) {
+    // Prefer the ID passed from the button; fall back to a global if you use one
+    const orderId = orderIdFromButton || window.currentCompleteOrderId || null;
+
+    if (!orderId) {
+        console.error('confirmCompleteOrder called but orderId is null/undefined');
+        showNotification('No order selected to complete', 'error');
+        return;
+    }
+
     showLoading();
-    closeCompleteOrderModal();
+
     try {
-        const r = await apiCall('completeOrder', { id: currentCompleteOrderId });
-        if (r.success) {
-            showMergeResults(r);
-            loadOrders();
-        } else showNotification(r.error || 'Failed', 'error');
-    } catch (e) { console.error(e); showNotification('Error completing order', 'error'); }
+        if (DEBUG_MODE) console.log('Completing order:', orderId);
+        const result = await apiCall('completeOrder', { id: orderId });
+
+        if (result.success) {
+            showNotification('Order completed! Inventory updated.');
+            // If you use a merge results modal, you can call showMergeResults(result) here
+            // showMergeResults(result);
+            loadOrders(); // Refresh the list
+        } else {
+            showNotification(result.error || 'Failed to complete order', 'error');
+        }
+    } catch (error) {
+        console.error('Error completing order:', error);
+        showNotification('Error completing order: ' + error.message, 'error');
+    }
+
     hideLoading();
 }
 
