@@ -1191,36 +1191,71 @@ async function deleteOrder(id) {
     hideLoading();
 }
 
-function openCompleteOrderModal(id) {
-    currentCompleteOrderId = id;
-    const o = allOrders.find(x => x.OrderID === id);
-    if (!o) return;
-    const items = o.Items || [];
-    let totalQty = 0; items.forEach(i => totalQty += parseInt(i.Quantity) || 0);
-    let html = '<div class="order-summary-box"><div class="summary-header"><strong>Order:</strong> ' + o.OrderID + '<br><strong>Vendor:</strong> ' + escapeHtml(o.Vendor) + '</div>' +
-        '<h5>📦 Items to add (' + items.length + ' types, ' + totalQty + ' units):</h5>' +
-        '<div class="items-to-add"><table class="mini-table"><thead><tr><th>S.No</th><th>Component</th><th>Type</th><th>Qty</th></tr></thead><tbody>';
-    items.forEach((it, i) => {
-        html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(it.ComponentName) + '</td>' +
-            '<td>' + (escapeHtml(it.Type) || '-') + '</td><td><strong>+' + it.Quantity + '</strong></td></tr>';
-    });
-    html += '</tbody></table></div></div>';
-    document.getElementById('completeOrderSummary').innerHTML = html;
+function openCompleteOrderModal(orderId) {
+    // Save the id globally so confirmCompleteOrder can use it
+    currentCompleteOrderId = orderId;
+
+    const order = allOrders.find(o => o.OrderID === orderId);
+    if (!order) {
+        showNotification('Order not found in current list', 'error');
+        return;
+    }
+
+    const items = order.Items || [];
+    let totalQty = 0;
+    items.forEach(i => totalQty += parseInt(i.Quantity) || 0);
+
+    // Build the summary HTML (this matches your modal body)
+    const summaryHtml = `
+        <div class="order-summary-box">
+            <div class="summary-header">
+                <strong>Order:</strong> ${order.OrderID}<br>
+                <strong>Vendor:</strong> ${escapeHtml(order.Vendor) || 'Unknown'}
+            </div>
+            <h5>📦 Items to be added to inventory (${items.length} types, ${totalQty} units):</h5>
+            <div class="items-to-add">
+                <table class="mini-table">
+                    <thead>
+                        <tr>
+                            <th>S.No</th>
+                            <th>Component</th>
+                            <th>Type</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map((item, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${escapeHtml(item.ComponentName)}</td>
+                                <td>${escapeHtml(item.Type) || '-'}</td>
+                                <td><strong>+${item.Quantity}</strong></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    const summaryDiv = document.getElementById('completeOrderSummary');
+    if (summaryDiv) summaryDiv.innerHTML = summaryHtml;
+
+    // Show the modal
     document.getElementById('completeOrderModal').classList.add('show');
 }
-
 function closeCompleteOrderModal() {
     document.getElementById('completeOrderModal').classList.remove('show');
     currentCompleteOrderId = null;
 }
 
 // This replaces your old confirmCompleteOrder
-async function confirmCompleteOrder(orderIdFromButton) {
-    // Prefer the ID passed from the button; fall back to a global if you use one
-    const orderId = orderIdFromButton || window.currentCompleteOrderId || null;
+async function confirmCompleteOrder() {
+    // Use the global currentCompleteOrderId set by openCompleteOrderModal
+    const orderId = currentCompleteOrderId;
 
     if (!orderId) {
-        console.error('confirmCompleteOrder called but orderId is null/undefined');
+        console.error('confirmCompleteOrder called but currentCompleteOrderId is null/undefined');
         showNotification('No order selected to complete', 'error');
         return;
     }
@@ -1233,9 +1268,12 @@ async function confirmCompleteOrder(orderIdFromButton) {
 
         if (result.success) {
             showNotification('Order completed! Inventory updated.');
-            // If you use a merge results modal, you can call showMergeResults(result) here
-            // showMergeResults(result);
-            loadOrders(); // Refresh the list
+            // If you want merge details, you can use:
+            if (typeof showMergeResults === 'function') {
+                showMergeResults(result);
+            }
+            // Refresh orders list
+            loadOrders();
         } else {
             showNotification(result.error || 'Failed to complete order', 'error');
         }
@@ -1245,6 +1283,10 @@ async function confirmCompleteOrder(orderIdFromButton) {
     }
 
     hideLoading();
+
+    // Close modal and reset global
+    document.getElementById('completeOrderModal').classList.remove('show');
+    currentCompleteOrderId = null;
 }
 
 function showMergeResults(r) {
