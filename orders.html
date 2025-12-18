@@ -18,7 +18,7 @@
         <div class="header-content">
             <div class="logo">
                 <div class="logo-icon">🔬</div>
-                Throttle by RahulS
+                ATL Dashboard
             </div>
             <nav class="nav">
                 <a href="index.html" class="nav-link">Home</a>
@@ -27,7 +27,7 @@
                 <a href="competitions.html" class="nav-link">Competitions</a>
                 <a href="orders.html" class="nav-link active">Orders</a>
                 <div class="nav-divider"></div>
-                <button class="nav-link logout-btn" onclick="logout()">Logout</button>
+                <button class="nav-link logout-btn" onclick="logout()">🚪 Logout</button>
             </nav>
         </div>
     </header>
@@ -56,7 +56,7 @@
                 <div class="stat-icon">🕐</div>
                 <div class="stat-info">
                     <span class="stat-value" id="pendingOrders">0</span>
-                    <span class="stat-label">Pending</span>
+                    <span class="stat-label">Ordered</span>
                 </div>
             </div>
             <div class="stat-card info">
@@ -77,7 +77,7 @@
 
         <!-- Filter Tabs -->
         <div class="filter-tabs">
-            <button class="filter-tab active" onclick="filterOrders('all', this)">📋 All Orders</button>
+            <button class="filter-tab active" onclick="filterOrders('all', this)">📋 All</button>
             <button class="filter-tab" onclick="filterOrders('Ordered', this)">🕐 Ordered</button>
             <button class="filter-tab" onclick="filterOrders('Shipped', this)">🚚 Shipped</button>
             <button class="filter-tab" onclick="filterOrders('Completed', this)">✅ Completed</button>
@@ -92,7 +92,9 @@
         </div>
     </main>
 
+    <!-- ============================= -->
     <!-- Import Order Modal -->
+    <!-- ============================= -->
     <div class="modal" id="importOrderModal">
         <div class="modal-content modal-lg">
             <div class="modal-header">
@@ -100,82 +102,89 @@
                 <button class="modal-close" onclick="closeImportOrderModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div class="import-instructions">
-                    <h4>📋 How to Import:</h4>
-                    <ol>
-                        <li>Download the template below</li>
-                        <li>Fill in: <code>S.No</code>, <code>ComponentName</code>, <code>Type</code>, <code>Quantity</code></li>
-                        <li>Save and upload the file</li>
-                    </ol>
-                    <div class="smart-match-info">
-                        <strong>🧠 Smart Matching:</strong> When you complete an order, components are matched intelligently:
-                        <ul>
-                            <li>"ESP 32" matches "esp32" or "ESP32"</li>
-                            <li>"Arduino UNO" matches "arduinouno"</li>
-                            <li>If found → quantity is ADDED to existing</li>
-                            <li>If not found → new component is created</li>
-                        </ul>
+                <div class="import-section">
+                    <div class="import-instructions">
+                        <h4>📋 How to Import:</h4>
+                        <ol>
+                            <li>Use Excel columns: <code>S.No</code>, <code>ComponentName</code>, <code>Type</code>, <code>Quantity</code></li>
+                            <li>Save as <strong>.xlsx</strong> or <strong>.csv</strong></li>
+                            <li>Upload the file below</li>
+                        </ol>
+                        <div class="smart-match-info">
+                            <strong>🧠 Smart Matching:</strong>
+                            <ul>
+                                <li>"ESP 32" = "esp32" = "ESP32"</li>
+                                <li>Existing components get quantity added</li>
+                                <li>New components are created automatically</li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="downloadOrderTemplate()">📄 Download Template</button>
                     </div>
-                    <button class="btn btn-secondary" onclick="downloadOrderTemplate()">📄 Download Template</button>
-                </div>
 
-                <div class="file-upload-zone" id="orderDropZone">
-                    <input type="file" id="orderFileInput" accept=".xlsx,.xls,.csv" onchange="handleOrderFile(this.files[0])" hidden>
-                    <div class="upload-icon">📁</div>
-                    <p>Drag & drop your Excel file here</p>
-                    <p class="or-text">or</p>
-                    <button class="btn btn-primary" onclick="document.getElementById('orderFileInput').click()">📂 Browse Files</button>
-                </div>
-
-                <div id="orderPreviewSection" style="display: none;">
-                    <h4>📦 Order Details</h4>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Vendor Name <span class="required">*</span></label>
-                            <input type="text" id="importVendor" class="form-control" placeholder="Amazon, Robu.in, Electronicscomp...">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Order Date</label>
-                            <input type="date" id="importOrderDate" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Expected Delivery</label>
-                            <input type="date" id="importExpectedDelivery" class="form-control">
-                        </div>
+                    <div class="file-upload-zone" id="orderDropZone">
+                        <input type="file" id="orderFileInput" accept=".xlsx,.xls,.csv" onchange="handleOrderFile(this.files[0])" hidden>
+                        <div class="upload-icon">📁</div>
+                        <p>Drag & drop your Excel file here</p>
+                        <p class="or-text">or</p>
+                        <button class="btn btn-primary" type="button" onclick="document.getElementById('orderFileInput').click()">📂 Browse Files</button>
                     </div>
-                    
-                    <h4>📋 Items Preview</h4>
-                    <div id="orderItemsPreview"></div>
-                    
-                    <div class="preview-stats">
-                        <span>Total Items: <strong id="previewTotalItems">0</strong></span>
-                        <span>Total Quantity: <strong id="previewTotalQty">0</strong></span>
+
+                    <div id="orderPreviewSection" style="display:none; margin-top:20px;">
+                        <h4>📦 Order Details</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Vendor Name <span class="required">*</span></label>
+                                <input type="text" id="importVendor" class="form-control" placeholder="Amazon, Robu.in, etc.">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Order Date</label>
+                                <input type="date" id="importOrderDate" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Expected Delivery</label>
+                                <input type="date" id="importExpectedDelivery" class="form-control">
+                            </div>
+                        </div>
+
+                        <h4>📋 Items Preview</h4>
+                        <div id="orderItemsPreview" class="items-preview-table"></div>
+
+                        <div class="preview-stats">
+                            <span>Total Items: <strong id="previewTotalItems">0</strong></span>
+                            <span>Total Quantity: <strong id="previewTotalQty">0</strong></span>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-success" id="confirmOrderImportBtn" onclick="confirmOrderImport()" disabled>✅ Create Order</button>
-                <button class="btn btn-secondary" onclick="closeImportOrderModal()">Cancel</button>
+                <button class="btn btn-secondary" type="button" onclick="closeImportOrderModal()">Cancel</button>
             </div>
         </div>
     </div>
 
+    <!-- ============================= -->
     <!-- View Order Modal -->
+    <!-- ============================= -->
     <div class="modal" id="viewOrderModal">
         <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h3 id="viewOrderTitle">Order Details</h3>
                 <button class="modal-close" onclick="closeViewOrderModal()">✕</button>
             </div>
-            <div class="modal-body" id="viewOrderBody"></div>
+            <div class="modal-body" id="viewOrderBody">
+                <!-- filled by script.js:viewOrder -->
+            </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" id="viewOrderEditBtn">✏️ Edit</button>
-                <button class="btn btn-secondary" onclick="closeViewOrderModal()">Close</button>
+                <button class="btn btn-secondary" type="button" onclick="closeViewOrderModal()">Close</button>
             </div>
         </div>
     </div>
 
+    <!-- ============================= -->
     <!-- Complete Order Modal -->
+    <!-- ============================= -->
     <div class="modal" id="completeOrderModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -183,48 +192,56 @@
                 <button class="modal-close" onclick="closeCompleteOrderModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div id="completeOrderSummary"></div>
+                <div id="completeOrderSummary">
+                    <!-- summary filled by openCompleteOrderModal(orderId) -->
+                </div>
                 <div class="merge-explanation">
                     <h4>🔄 What will happen:</h4>
                     <ul>
-                        <li>🧠 <strong>Smart Matching</strong> - "ESP 32" will match "esp32" or "ESP32"</li>
-                        <li>➕ <strong>If component exists</strong> → quantity will be ADDED</li>
-                        <li>🆕 <strong>If component is new</strong> → it will be created</li>
-                        <li>📝 Order status → <strong>Completed</strong></li>
+                        <li>Existing components will have quantity increased</li>
+                        <li>New component names will be created</li>
+                        <li>Matching is case-insensitive and ignores spaces (ESP 32 = esp32)</li>
+                        <li>Order status will become <strong>Completed</strong></li>
                     </ul>
                 </div>
                 <div class="warning-box">
-                    <strong>⚠️ Note:</strong> This will add all items to your components inventory.
+                    <strong>⚠️ Note:</strong> This action cannot be undone.
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-success btn-lg" onclick="confirmCompleteOrder()">✅ Complete & Add to Inventory</button>
-                <button class="btn btn-secondary" onclick="closeCompleteOrderModal()">Cancel</button>
+                <!-- confirmCompleteOrder uses global currentCompleteOrderId set in openCompleteOrderModal -->
+                <button class="btn btn-success btn-lg" type="button" onclick="confirmCompleteOrder()">✅ Complete & Add</button>
+                <button class="btn btn-secondary btn-lg" type="button" onclick="closeCompleteOrderModal()">Cancel</button>
             </div>
         </div>
     </div>
 
+    <!-- ============================= -->
     <!-- Merge Results Modal -->
+    <!-- ============================= -->
     <div class="modal" id="mergeResultsModal">
         <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h3>🎉 Order Completed Successfully!</h3>
+                <h3>🎉 Order Completed!</h3>
                 <button class="modal-close" onclick="closeMergeResultsModal()">✕</button>
             </div>
-            <div class="modal-body" id="mergeResultsContent"></div>
+            <div class="modal-body" id="mergeResultsContent">
+                <!-- filled by script.js:showMergeResults -->
+            </div>
             <div class="modal-footer">
                 <a href="components.html" class="btn btn-info">📦 View Components</a>
-                <button class="btn btn-primary" onclick="closeMergeResultsModal()">Done</button>
+                <button class="btn btn-primary" type="button" onclick="closeMergeResultsModal()">Done</button>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/script.js"></script>
     <script src="js/auth.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             if (typeof checkAuth === 'function' && !checkAuth()) return;
             loadOrders();
             setupOrderDropZone();
