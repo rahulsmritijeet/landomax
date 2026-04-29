@@ -1563,8 +1563,9 @@ async function saveOrder(event) {
 // ISSUANCES MODULE
 // =====================================================
 
-let allIssuances = [];
-let allIssuanceComponents = [];
+var allIssuances = [];
+var allIssuanceComponents = [];
+var issuanceCart = []; // holds multiple components to issue
 
 // -------------------------------------------------------
 // DATA LOADING
@@ -1573,19 +1574,18 @@ let allIssuanceComponents = [];
 async function loadIssuances() {
     showLoading();
     try {
-        const [issuanceRes, componentRes] = await Promise.all([
+        var results = await Promise.all([
             apiCall('getIssuances'),
             apiCall('getComponents')
         ]);
 
-        allIssuances = issuanceRes.data || [];
-        allIssuanceComponents = componentRes.data || [];
+        allIssuances = results[0].data || [];
+        allIssuanceComponents = results[1].data || [];
 
         updateIssuanceSummary(allIssuances);
         populateIssuanceComponentDropdown(allIssuanceComponents);
         populateFilterComponentDropdown(allIssuanceComponents);
         applyIssuanceFilters();
-
     } catch (e) {
         console.error('loadIssuances error', e);
         showNotification('Failed to load issuances', 'error');
@@ -1598,55 +1598,83 @@ async function loadIssuances() {
 // -------------------------------------------------------
 
 function updateIssuanceSummary(issuances) {
-    const issued    = issuances.filter(function(i) { return i.Status === 'Issued'; });
-    const returned  = issuances.filter(function(i) { return i.Status === 'Returned'; });
-    const studentIds = [...new Set(issuances.map(function(i) { return i.StudentID; }).filter(Boolean))];
+    var issued = issuances.filter(function(i) { return i.Status === 'Issued'; });
+    var returned = issuances.filter(function(i) { return i.Status === 'Returned'; });
 
-    const totalEl    = document.getElementById('issuanceTotalRecords');
-    const issuedEl   = document.getElementById('issuanceCurrentlyIssued');
-    const returnedEl = document.getElementById('issuanceReturned');
-    const studentsEl = document.getElementById('issuanceUniqueStudents');
+    var studentMap = {};
+    issuances.forEach(function(i) {
+        var name = (i.StudentName || '').toLowerCase().trim();
+        if (name) studentMap[name] = true;
+    });
 
-    if (totalEl)    totalEl.textContent    = issuances.length;
-    if (issuedEl)   issuedEl.textContent   = issued.length;
-    if (returnedEl) returnedEl.textContent = returned.length;
-    if (studentsEl) studentsEl.textContent = studentIds.length;
+    var el1 = document.getElementById('issuanceTotalRecords');
+    var el2 = document.getElementById('issuanceCurrentlyIssued');
+    var el3 = document.getElementById('issuanceReturned');
+    var el4 = document.getElementById('issuanceUniqueStudents');
+
+    if (el1) el1.textContent = issuances.length;
+    if (el2) el2.textContent = issued.length;
+    if (el3) el3.textContent = returned.length;
+    if (el4) el4.textContent = Object.keys(studentMap).length;
 }
 
 // -------------------------------------------------------
-// DROPDOWNS
+// COMPONENT DROPDOWN (reads from Components sheet)
 // -------------------------------------------------------
 
 function populateIssuanceComponentDropdown(components) {
-    const select = document.getElementById('issueComponentSelect');
+    var select = document.getElementById('issueComponentSelect');
     if (!select) return;
 
-    const current = select.value;
     select.innerHTML = '<option value="">Select component...</option>';
 
-    components.forEach(function(c) {
-        const qty = parseInt(c.Quantity) || 0;
-        const option = document.createElement('option');
-        option.value = c.ComponentID;
-        option.textContent = c.ComponentName + ' (' + c.Type + ') — ' + qty + ' available';
-        option.dataset.qty = qty;
-        option.dataset.name = c.ComponentName;
-        if (qty === 0) option.disabled = true;
-        select.appendChild(option);
+    var sorted = components.slice().sort(function(a, b) {
+        return (a.ComponentName || '').localeCompare(b.ComponentName || '');
     });
 
-    if (current) select.value = current;
+    var groups = {};
+    sorted.forEach(function(c) {
+        var type = c.Type || 'Other';
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(c);
+    });
+
+    Object.keys(groups).sort().forEach(function(type) {
+        var optgroup = document.createElement('optgroup');
+        optgroup.label = type;
+
+        groups[type].forEach(function(c) {
+            var qty = parseInt(c.Quantity) || 0;
+            var option = document.createElement('option');
+            option.value = c.ComponentID;
+            option.textContent = c.ComponentName + ' -- ' + qty + ' in stock';
+            option.dataset.componentId = c.ComponentID;
+            option.dataset.componentName = c.ComponentName;
+            option.dataset.type = c.Type || '';
+            option.dataset.description = c.Description || '';
+            option.dataset.qty = qty;
+
+            if (qty === 0) {
+                option.disabled = true;
+                option.textContent += ' (out of stock)';
+            }
+
+            optgroup.appendChild(option);
+        });
+
+        select.appendChild(optgroup);
+    });
 }
 
 function populateFilterComponentDropdown(components) {
-    const select = document.getElementById('issuanceFilterComponent');
+    var select = document.getElementById('issuanceFilterComponent');
     if (!select) return;
 
-    const current = select.value;
+    var current = select.value;
     select.innerHTML = '<option value="">All Components</option>';
 
     components.forEach(function(c) {
-        const option = document.createElement('option');
+        var option = document.createElement('option');
         option.value = c.ComponentID;
         option.textContent = c.ComponentName;
         select.appendChild(option);
@@ -1656,104 +1684,292 @@ function populateFilterComponentDropdown(components) {
 }
 
 // -------------------------------------------------------
+// CART - ADD MULTIPLE COMPONENTS BEFORE ISSUING
+// -------------------------------------------------------
+
+function updateAddQtyMax() {
+    var select = document.getElementById('issueComponentSelect');
+    var qtyInput = document.getElementById('addItemQty');
+    var hint = document.getElementById('addItemHint');
+
+    if (!select || !qtyInput) return;
+
+    var selected = select.options[select.selectedIndex];
+
+    if (!selected || !selected.value) {
+        qtyInput.max = 1;
+        qtyInput.value = 1;
+        if (hint) hint.textContent = '';
+        return;
+    }
+
+    var maxQty = parseInt(selected.dataset.qty) || 0;
+    var desc = selected.dataset.description || '';
+
+    qtyInput.max = maxQty > 0 ? maxQty : 1;
+    if (parseInt(qtyInput.value) > maxQty) qtyInput.value = maxQty;
+    if (parseInt(qtyInput.value) < 1) qtyInput.value = 1;
+
+    if (hint) {
+        if (maxQty === 0) {
+            hint.textContent = 'Out of stock';
+            hint.style.color = '#ef4444';
+        } else if (maxQty <= 5) {
+            hint.textContent = 'Low stock -- ' + maxQty + ' available';
+            hint.style.color = '#f59e0b';
+        } else {
+            hint.textContent = maxQty + ' available';
+            hint.style.color = '#22c55e';
+        }
+        if (desc) hint.textContent += ' -- ' + desc;
+    }
+}
+
+function addToIssuanceCart() {
+    var select = document.getElementById('issueComponentSelect');
+    var qtyInput = document.getElementById('addItemQty');
+
+    if (!select || !select.value) {
+        showNotification('Select a component first', 'warning');
+        return;
+    }
+
+    var selected = select.options[select.selectedIndex];
+    var componentId = selected.dataset.componentId;
+    var componentName = selected.dataset.componentName;
+    var maxQty = parseInt(selected.dataset.qty) || 0;
+    var qty = parseInt(qtyInput.value) || 1;
+
+    if (qty < 1) {
+        showNotification('Quantity must be at least 1', 'warning');
+        return;
+    }
+
+    if (qty > maxQty) {
+        showNotification('Only ' + maxQty + ' units of ' + componentName + ' available', 'error');
+        return;
+    }
+
+    // Check if already in cart
+    var existing = null;
+    for (var i = 0; i < issuanceCart.length; i++) {
+        if (issuanceCart[i].componentId === componentId) {
+            existing = issuanceCart[i];
+            break;
+        }
+    }
+
+    if (existing) {
+        var newTotal = existing.qtyIssued + qty;
+        if (newTotal > maxQty) {
+            showNotification('Total would exceed available stock (' + maxQty + ')', 'error');
+            return;
+        }
+        existing.qtyIssued = newTotal;
+        showNotification(componentName + ' quantity updated to ' + newTotal);
+    } else {
+        issuanceCart.push({
+            componentId: componentId,
+            componentName: componentName,
+            qtyIssued: qty,
+            maxQty: maxQty
+        });
+        showNotification(componentName + ' added');
+    }
+
+    // Reset dropdown and qty
+    select.value = '';
+    qtyInput.value = 1;
+    var hint = document.getElementById('addItemHint');
+    if (hint) hint.textContent = '';
+
+    renderIssuanceCart();
+}
+
+function removeFromIssuanceCart(index) {
+    issuanceCart.splice(index, 1);
+    renderIssuanceCart();
+}
+
+function updateCartItemQty(index, value) {
+    var qty = parseInt(value) || 1;
+    var item = issuanceCart[index];
+    if (!item) return;
+
+    if (qty < 1) qty = 1;
+    if (qty > item.maxQty) {
+        showNotification('Only ' + item.maxQty + ' available for ' + item.componentName, 'warning');
+        qty = item.maxQty;
+    }
+
+    item.qtyIssued = qty;
+    renderIssuanceCart();
+}
+
+function renderIssuanceCart() {
+    var container = document.getElementById('issuanceCartItems');
+    var countEl = document.getElementById('issuanceCartCount');
+    var submitBtn = document.getElementById('submitIssuanceBtn');
+
+    if (!container) return;
+
+    if (!issuanceCart.length) {
+        container.innerHTML = '<div class="no-data" style="padding:24px;">No components added yet. Select components above.</div>';
+        if (countEl) countEl.textContent = '0';
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    if (countEl) countEl.textContent = issuanceCart.length;
+    if (submitBtn) submitBtn.disabled = false;
+
+    var totalUnits = 0;
+    var html = '<table class="order-items-table"><thead><tr>' +
+        '<th>Component</th>' +
+        '<th>Qty</th>' +
+        '<th>Stock</th>' +
+        '<th></th>' +
+        '</tr></thead><tbody>';
+
+    issuanceCart.forEach(function(item, idx) {
+        totalUnits += item.qtyIssued;
+        var overStock = item.qtyIssued > item.maxQty;
+
+        html += '<tr' + (overStock ? ' style="background:rgba(239,68,68,0.1);"' : '') + '>' +
+            '<td><strong>' + escapeHtml(item.componentName) + '</strong>' +
+            '<br><code>' + item.componentId + '</code></td>' +
+            '<td><input type="number" class="qty-input-sm" value="' + item.qtyIssued + '" ' +
+            'min="1" max="' + item.maxQty + '" ' +
+            'onchange="updateCartItemQty(' + idx + ', this.value)"></td>' +
+            '<td><span class="' + (item.maxQty <= 5 ? 'qty-low' : 'qty-ok') + '" ' +
+            'style="padding:3px 8px;border-radius:10px;font-size:12px;">' +
+            item.maxQty + '</span></td>' +
+            '<td><button class="btn btn-sm btn-danger" onclick="removeFromIssuanceCart(' + idx + ')">X</button></td>' +
+            '</tr>';
+    });
+
+    html += '</tbody></table>';
+    html += '<div style="display:flex;gap:16px;padding:12px 0;font-size:13px;color:var(--text-secondary);">' +
+        '<span>' + issuanceCart.length + ' component(s)</span>' +
+        '<span>' + totalUnits + ' total units</span>' +
+        '</div>';
+
+    container.innerHTML = html;
+}
+
+function clearIssuanceCart() {
+    issuanceCart = [];
+    renderIssuanceCart();
+}
+
+// -------------------------------------------------------
 // QUICK ISSUE (called from inventory tab)
 // -------------------------------------------------------
 
 function quickIssueComponent(componentId, componentName) {
-    // Switch to issuances tab
     switchIssuanceTab('issuances');
 
-    // Pre-select the component
-    const select = document.getElementById('issueComponentSelect');
-    if (select) {
-        select.value = componentId;
-        updateMaxQty();
+    var comp = allIssuanceComponents.find(function(c) { return c.ComponentID === componentId; });
+    var maxQty = comp ? (parseInt(comp.Quantity) || 0) : 0;
+
+    // Check if already in cart
+    var existing = null;
+    for (var i = 0; i < issuanceCart.length; i++) {
+        if (issuanceCart[i].componentId === componentId) {
+            existing = issuanceCart[i];
+            break;
+        }
     }
 
-    // Focus student name
-    const studentInput = document.getElementById('issueStudentName');
-    if (studentInput) studentInput.focus();
+    if (!existing) {
+        issuanceCart.push({
+            componentId: componentId,
+            componentName: componentName,
+            qtyIssued: 1,
+            maxQty: maxQty
+        });
+        renderIssuanceCart();
+    }
 
-    showNotification('Component selected: ' + componentName + '. Fill in student details.');
+    showNotification(componentName + ' added to issuance list');
+
+    var nameInput = document.getElementById('issueStudentName');
+    if (nameInput) nameInput.focus();
 }
 
 // -------------------------------------------------------
-// ISSUE FORM — MAX QTY UPDATE
+// SUBMIT ISSUANCE (sends entire cart)
 // -------------------------------------------------------
 
-function updateMaxQty() {
-    const select = document.getElementById('issueComponentSelect');
-    const qtyInput = document.getElementById('issueQty');
-    const maxLabel = document.getElementById('maxQtyLabel');
-
-    if (!select || !qtyInput) return;
-
-    const selectedOption = select.options[select.selectedIndex];
-    const maxQty = parseInt(selectedOption?.dataset?.qty) || 0;
-
-    qtyInput.max = maxQty;
-    if (parseInt(qtyInput.value) > maxQty) qtyInput.value = maxQty;
-    if (maxLabel) maxLabel.textContent = maxQty > 0 ? 'Max available: ' + maxQty : 'Out of stock';
-}
-
-// -------------------------------------------------------
-// ISSUE FORM — SUBMIT
-// -------------------------------------------------------
-
-async function submitIssueForm(event) {
+async function submitIssuanceForm(event) {
     event.preventDefault();
 
-    const studentName  = (document.getElementById('issueStudentName')?.value || '').trim();
-    const studentId    = (document.getElementById('issueStudentId')?.value || '').trim();
-    const select       = document.getElementById('issueComponentSelect');
-    const componentId  = select?.value || '';
-    const componentName = select?.options[select.selectedIndex]?.dataset?.name || '';
-    const qty          = parseInt(document.getElementById('issueQty')?.value) || 1;
+    var studentName = (document.getElementById('issueStudentName')?.value || '').trim();
 
-    // Validation
-    if (!studentName) { showNotification('Enter student name', 'warning'); return; }
-    if (!studentId)   { showNotification('Enter student ID', 'warning'); return; }
-    if (!componentId) { showNotification('Select a component', 'warning'); return; }
-    if (qty < 1)      { showNotification('Quantity must be at least 1', 'warning'); return; }
-
-    const maxQty = parseInt(select.options[select.selectedIndex]?.dataset?.qty) || 0;
-    if (qty > maxQty) {
-        showNotification('Only ' + maxQty + ' units available', 'error');
+    if (!studentName) {
+        showNotification('Enter student name', 'warning');
+        document.getElementById('issueStudentName').focus();
         return;
     }
 
+    if (!issuanceCart.length) {
+        showNotification('Add at least one component', 'warning');
+        return;
+    }
+
+    // Validate all quantities
+    var hasError = false;
+    issuanceCart.forEach(function(item) {
+        if (item.qtyIssued > item.maxQty) {
+            showNotification(item.componentName + ': only ' + item.maxQty + ' available', 'error');
+            hasError = true;
+        }
+        if (item.qtyIssued < 1) {
+            showNotification(item.componentName + ': quantity must be at least 1', 'error');
+            hasError = true;
+        }
+    });
+
+    if (hasError) return;
+
     showLoading();
     try {
-        const result = await apiCall('addIssuance', {
+        var result = await apiCall('addIssuance', {
             data: {
-                studentName:   studentName,
-                studentId:     studentId,
-                componentId:   componentId,
-                componentName: componentName,
-                qtyIssued:     qty
+                studentName: studentName,
+                items: issuanceCart.map(function(item) {
+                    return {
+                        componentId: item.componentId,
+                        componentName: item.componentName,
+                        qtyIssued: item.qtyIssued
+                    };
+                })
             }
         });
 
         if (result.success) {
-            showNotification('Component issued successfully. ID: ' + result.id);
-            resetIssueForm();
+            showNotification(
+                result.count + ' component(s) issued to ' + studentName
+            );
+            resetIssuanceForm();
             loadIssuances();
         } else {
-            showNotification(result.error || 'Failed to issue component', 'error');
+            showNotification(result.error || 'Failed to issue', 'error');
         }
     } catch (e) {
-        console.error('submitIssueForm error', e);
-        showNotification('Error issuing component', 'error');
+        console.error('submitIssuanceForm error', e);
+        showNotification('Error issuing components', 'error');
     }
     hideLoading();
 }
 
-function resetIssueForm() {
-    const form = document.getElementById('issueComponentForm');
+function resetIssuanceForm() {
+    var form = document.getElementById('issueComponentForm');
     if (form) form.reset();
-
-    const maxLabel = document.getElementById('maxQtyLabel');
-    if (maxLabel) maxLabel.textContent = '';
+    issuanceCart = [];
+    renderIssuanceCart();
+    var hint = document.getElementById('addItemHint');
+    if (hint) hint.textContent = '';
 }
 
 // -------------------------------------------------------
@@ -1761,19 +1977,18 @@ function resetIssueForm() {
 // -------------------------------------------------------
 
 function applyIssuanceFilters() {
-    const searchVal   = (document.getElementById('issuanceSearch')?.value || '').toLowerCase();
-    const statusVal   = document.getElementById('issuanceFilterStatus')?.value || '';
-    const componentVal = document.getElementById('issuanceFilterComponent')?.value || '';
+    var searchVal = (document.getElementById('issuanceSearch')?.value || '').toLowerCase();
+    var statusVal = document.getElementById('issuanceFilterStatus')?.value || '';
+    var componentVal = document.getElementById('issuanceFilterComponent')?.value || '';
 
-    const filtered = allIssuances.filter(function(i) {
-        const matchSearch = !searchVal ||
-            (i.StudentName  || '').toLowerCase().includes(searchVal) ||
-            (i.StudentID    || '').toLowerCase().includes(searchVal) ||
-            (i.ComponentName|| '').toLowerCase().includes(searchVal) ||
-            (i.IssuanceID   || '').toLowerCase().includes(searchVal);
+    var filtered = allIssuances.filter(function(i) {
+        var matchSearch = !searchVal ||
+            (i.StudentName || '').toLowerCase().indexOf(searchVal) !== -1 ||
+            (i.ComponentName || '').toLowerCase().indexOf(searchVal) !== -1 ||
+            (i.IssuanceID || '').toLowerCase().indexOf(searchVal) !== -1;
 
-        const matchStatus    = !statusVal    || i.Status      === statusVal;
-        const matchComponent = !componentVal || i.ComponentID === componentVal;
+        var matchStatus = !statusVal || i.Status === statusVal;
+        var matchComponent = !componentVal || i.ComponentID === componentVal;
 
         return matchSearch && matchStatus && matchComponent;
     });
@@ -1786,32 +2001,30 @@ function applyIssuanceFilters() {
 // -------------------------------------------------------
 
 function renderIssuancesTable(issuances) {
-    const tbody = document.getElementById('issuancesTableBody');
+    var tbody = document.getElementById('issuancesTableBody');
     if (!tbody) return;
 
     if (!issuances || !issuances.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No issuance records found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No issuance records found</td></tr>';
         return;
     }
 
-    let html = '';
+    var html = '';
 
     issuances.forEach(function(i) {
-        const isIssued      = i.Status === 'Issued';
-        const statusClass   = isIssued ? 'status-issued' : 'status-returned';
-        const statusLabel   = isIssued ? 'Issued' : 'Returned';
+        var isIssued = i.Status === 'Issued';
+        var statusClass = isIssued ? 'status-issued' : 'status-returned';
+        var statusLabel = isIssued ? 'Issued' : 'Returned';
 
-        // Escape single quotes for inline onclick
-        const safeComponent = (i.ComponentName || '').replace(/'/g, "\\'");
-        const safeStudent   = (i.StudentName   || '').replace(/'/g, "\\'");
+        var safeComponent = (i.ComponentName || '').replace(/'/g, "\\'");
+        var safeStudent = (i.StudentName || '').replace(/'/g, "\\'");
 
         html += '<tr>' +
             '<td><code>' + escapeHtml(i.IssuanceID) + '</code></td>' +
             '<td>' +
-                '<div class="student-info">' +
-                    '<span class="student-name">' + escapeHtml(i.StudentName) + '</span>' +
-                    '<span class="student-id">' + escapeHtml(i.StudentID) + '</span>' +
-                '</div>' +
+                '<span class="student-name-link" onclick="viewStudentHistory(\'' + safeStudent + '\')" ' +
+                'style="cursor:pointer;text-decoration:underline;">' +
+                escapeHtml(i.StudentName) + '</span>' +
             '</td>' +
             '<td>' +
                 '<div class="student-info">' +
@@ -1821,11 +2034,11 @@ function renderIssuancesTable(issuances) {
             '</td>' +
             '<td><strong>' + escapeHtml(String(i.QtyIssued || '')) + '</strong></td>' +
             '<td>' + formatDate(i.DateIssued) + '</td>' +
-            '<td>' + (i.DateReturned ? formatDate(i.DateReturned) : '-') + '</td>' +
+            '<td>' + (i.DateReturned ? formatDate(i.DateReturned) : '--') + '</td>' +
             '<td><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></td>' +
             '<td class="actions">' +
                 (isIssued
-                    ? '<button class="btn btn-sm btn-success" onclick="confirmReturn(\'' + i.IssuanceID + '\',\'' + safeComponent + '\',\'' + safeStudent + '\')">Mark Returned</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="confirmReturn(\'' + i.IssuanceID + '\',\'' + safeComponent + '\',\'' + safeStudent + '\')">Return</button>'
                     : '') +
                 '<button class="btn btn-sm btn-danger" onclick="confirmDeleteIssuance(\'' + i.IssuanceID + '\')">Delete</button>' +
             '</td>' +
@@ -1848,27 +2061,26 @@ function confirmReturn(issuanceId, componentName, studentName) {
 async function markReturned(issuanceId) {
     showLoading();
     try {
-        const result = await apiCall('returnIssuance', { id: issuanceId });
-
+        var result = await apiCall('returnIssuance', { id: issuanceId });
         if (result.success) {
             showNotification('Component marked as returned');
             loadIssuances();
         } else {
-            showNotification(result.error || 'Failed to mark as returned', 'error');
+            showNotification(result.error || 'Failed', 'error');
         }
     } catch (e) {
         console.error('markReturned error', e);
-        showNotification('Error marking as returned', 'error');
+        showNotification('Error', 'error');
     }
     hideLoading();
 }
 
 // -------------------------------------------------------
-// DELETE ISSUANCE
+// DELETE
 // -------------------------------------------------------
 
 function confirmDeleteIssuance(issuanceId) {
-    if (confirm('Are you sure you want to delete this issuance record?\n\nThis cannot be undone.')) {
+    if (confirm('Delete this issuance record? This cannot be undone.')) {
         deleteIssuance(issuanceId);
     }
 }
@@ -1876,68 +2088,63 @@ function confirmDeleteIssuance(issuanceId) {
 async function deleteIssuance(issuanceId) {
     showLoading();
     try {
-        const result = await apiCall('deleteIssuance', { id: issuanceId });
-
+        var result = await apiCall('deleteIssuance', { id: issuanceId });
         if (result.success) {
-            showNotification('Issuance record deleted');
+            showNotification('Record deleted');
             loadIssuances();
         } else {
-            showNotification(result.error || 'Failed to delete record', 'error');
+            showNotification(result.error || 'Failed', 'error');
         }
     } catch (e) {
         console.error('deleteIssuance error', e);
-        showNotification('Error deleting record', 'error');
     }
     hideLoading();
 }
 
 // -------------------------------------------------------
-// TAB SWITCHING (for components page with inventory + issuances tabs)
+// TAB SWITCHING
 // -------------------------------------------------------
 
 function switchIssuanceTab(tabName) {
-    // Update tab buttons
     document.querySelectorAll('.issuance-tab-btn').forEach(function(btn) {
         btn.classList.remove('active');
     });
-    const activeBtn = document.querySelector('.issuance-tab-btn[data-tab="' + tabName + '"]');
+    var activeBtn = document.querySelector('.issuance-tab-btn[data-tab="' + tabName + '"]');
     if (activeBtn) activeBtn.classList.add('active');
 
-    // Update tab panels
     document.querySelectorAll('.issuance-tab-panel').forEach(function(panel) {
         panel.classList.remove('active');
     });
-    const activePanel = document.getElementById('issuanceTab-' + tabName);
+    var activePanel = document.getElementById('issuanceTab-' + tabName);
     if (activePanel) activePanel.classList.add('active');
 
-    // Load data when switching to issuances tab
     if (tabName === 'issuances' && allIssuances.length === 0) {
         loadIssuances();
     }
 }
 
 // -------------------------------------------------------
-// STUDENT HISTORY MODAL
+// STUDENT HISTORY
 // -------------------------------------------------------
 
-async function viewStudentHistory(studentId) {
+async function viewStudentHistory(studentName) {
     showLoading();
     try {
-        const result = await apiCall('getIssuancesByStudent', { id: studentId });
-        const records = result.data || [];
+        var result = await apiCall('getIssuancesByStudent', { id: studentName });
+        var records = result.data || [];
 
-        const student = allIssuances.find(function(i) { return i.StudentID === studentId; });
-        const studentName = student ? student.StudentName : studentId;
-
-        let html = '<div class="student-history">';
+        var html = '<div class="student-history">';
         html += '<div class="history-header">';
         html += '<h4>' + escapeHtml(studentName) + '</h4>';
-        html += '<span class="student-id-badge">' + escapeHtml(studentId) + '</span>';
         html += '</div>';
+
+        var activeCount = records.filter(function(r) { return r.Status === 'Issued'; }).length;
+        var returnedCount = records.filter(function(r) { return r.Status === 'Returned'; }).length;
+
         html += '<div class="history-stats">';
         html += '<span>Total: <strong>' + records.length + '</strong></span>';
-        html += '<span>Active: <strong>' + records.filter(function(r) { return r.Status === 'Issued'; }).length + '</strong></span>';
-        html += '<span>Returned: <strong>' + records.filter(function(r) { return r.Status === 'Returned'; }).length + '</strong></span>';
+        html += '<span>Active: <strong>' + activeCount + '</strong></span>';
+        html += '<span>Returned: <strong>' + returnedCount + '</strong></span>';
         html += '</div>';
 
         if (records.length) {
@@ -1946,30 +2153,29 @@ async function viewStudentHistory(studentId) {
             html += '</tr></thead><tbody>';
 
             records.forEach(function(r) {
-                const statusClass = r.Status === 'Issued' ? 'status-issued' : 'status-returned';
+                var statusClass = r.Status === 'Issued' ? 'status-issued' : 'status-returned';
                 html += '<tr>' +
                     '<td><code>' + escapeHtml(r.IssuanceID) + '</code></td>' +
                     '<td>' + escapeHtml(r.ComponentName) + '</td>' +
                     '<td>' + escapeHtml(String(r.QtyIssued || '')) + '</td>' +
                     '<td>' + formatDate(r.DateIssued) + '</td>' +
-                    '<td>' + (r.DateReturned ? formatDate(r.DateReturned) : '-') + '</td>' +
+                    '<td>' + (r.DateReturned ? formatDate(r.DateReturned) : '--') + '</td>' +
                     '<td><span class="status-badge ' + statusClass + '">' + escapeHtml(r.Status) + '</span></td>' +
                     '</tr>';
             });
 
             html += '</tbody></table>';
         } else {
-            html += '<p class="no-data">No records found for this student</p>';
+            html += '<div class="no-data">No records found</div>';
         }
 
         html += '</div>';
 
         document.getElementById('studentHistoryBody').innerHTML = html;
         document.getElementById('studentHistoryModal').classList.add('show');
-
     } catch (e) {
         console.error('viewStudentHistory error', e);
-        showNotification('Failed to load student history', 'error');
+        showNotification('Failed to load history', 'error');
     }
     hideLoading();
 }
@@ -1979,34 +2185,32 @@ function closeStudentHistoryModal() {
 }
 
 // -------------------------------------------------------
-// EXPORT ISSUANCES
+// EXPORT
 // -------------------------------------------------------
 
 function exportIssuances() {
     if (!allIssuances.length) {
-        showNotification('No issuance records to export', 'warning');
+        showNotification('No records to export', 'warning');
         return;
     }
 
-    const data = allIssuances.map(function(i) {
+    var data = allIssuances.map(function(i) {
         return {
-            'Issuance ID':     i.IssuanceID,
-            'Student Name':    i.StudentName,
-            'Student ID':      i.StudentID,
-            'Component':       i.ComponentName,
-            'Component ID':    i.ComponentID,
-            'Qty Issued':      i.QtyIssued,
-            'Date Issued':     formatDate(i.DateIssued),
-            'Date Returned':   i.DateReturned ? formatDate(i.DateReturned) : '',
-            'Status':          i.Status
+            'Issuance ID': i.IssuanceID,
+            'Student Name': i.StudentName,
+            'Component': i.ComponentName,
+            'Component ID': i.ComponentID,
+            'Qty Issued': i.QtyIssued,
+            'Date Issued': formatDate(i.DateIssued),
+            'Date Returned': i.DateReturned ? formatDate(i.DateReturned) : '',
+            'Status': i.Status
         };
     });
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Issuances');
     XLSX.writeFile(wb, 'ATL_Issuances_' + new Date().toISOString().split('T')[0] + '.xlsx');
-    showNotification('Issuances exported!');
+    showNotification('Exported successfully');
 }
-
 console.log('✅ Script.js loaded');
