@@ -1558,4 +1558,455 @@ async function saveOrder(event) {
     hideLoading();
 }
 
+
+// =====================================================
+// ISSUANCES MODULE
+// =====================================================
+
+let allIssuances = [];
+let allIssuanceComponents = [];
+
+// -------------------------------------------------------
+// DATA LOADING
+// -------------------------------------------------------
+
+async function loadIssuances() {
+    showLoading();
+    try {
+        const [issuanceRes, componentRes] = await Promise.all([
+            apiCall('getIssuances'),
+            apiCall('getComponents')
+        ]);
+
+        allIssuances = issuanceRes.data || [];
+        allIssuanceComponents = componentRes.data || [];
+
+        updateIssuanceSummary(allIssuances);
+        populateIssuanceComponentDropdown(allIssuanceComponents);
+        populateFilterComponentDropdown(allIssuanceComponents);
+        applyIssuanceFilters();
+
+    } catch (e) {
+        console.error('loadIssuances error', e);
+        showNotification('Failed to load issuances', 'error');
+    }
+    hideLoading();
+}
+
+// -------------------------------------------------------
+// SUMMARY CARDS
+// -------------------------------------------------------
+
+function updateIssuanceSummary(issuances) {
+    const issued    = issuances.filter(function(i) { return i.Status === 'Issued'; });
+    const returned  = issuances.filter(function(i) { return i.Status === 'Returned'; });
+    const studentIds = [...new Set(issuances.map(function(i) { return i.StudentID; }).filter(Boolean))];
+
+    const totalEl    = document.getElementById('issuanceTotalRecords');
+    const issuedEl   = document.getElementById('issuanceCurrentlyIssued');
+    const returnedEl = document.getElementById('issuanceReturned');
+    const studentsEl = document.getElementById('issuanceUniqueStudents');
+
+    if (totalEl)    totalEl.textContent    = issuances.length;
+    if (issuedEl)   issuedEl.textContent   = issued.length;
+    if (returnedEl) returnedEl.textContent = returned.length;
+    if (studentsEl) studentsEl.textContent = studentIds.length;
+}
+
+// -------------------------------------------------------
+// DROPDOWNS
+// -------------------------------------------------------
+
+function populateIssuanceComponentDropdown(components) {
+    const select = document.getElementById('issueComponentSelect');
+    if (!select) return;
+
+    const current = select.value;
+    select.innerHTML = '<option value="">Select component...</option>';
+
+    components.forEach(function(c) {
+        const qty = parseInt(c.Quantity) || 0;
+        const option = document.createElement('option');
+        option.value = c.ComponentID;
+        option.textContent = c.ComponentName + ' (' + c.Type + ') — ' + qty + ' available';
+        option.dataset.qty = qty;
+        option.dataset.name = c.ComponentName;
+        if (qty === 0) option.disabled = true;
+        select.appendChild(option);
+    });
+
+    if (current) select.value = current;
+}
+
+function populateFilterComponentDropdown(components) {
+    const select = document.getElementById('issuanceFilterComponent');
+    if (!select) return;
+
+    const current = select.value;
+    select.innerHTML = '<option value="">All Components</option>';
+
+    components.forEach(function(c) {
+        const option = document.createElement('option');
+        option.value = c.ComponentID;
+        option.textContent = c.ComponentName;
+        select.appendChild(option);
+    });
+
+    if (current) select.value = current;
+}
+
+// -------------------------------------------------------
+// QUICK ISSUE (called from inventory tab)
+// -------------------------------------------------------
+
+function quickIssueComponent(componentId, componentName) {
+    // Switch to issuances tab
+    switchIssuanceTab('issuances');
+
+    // Pre-select the component
+    const select = document.getElementById('issueComponentSelect');
+    if (select) {
+        select.value = componentId;
+        updateMaxQty();
+    }
+
+    // Focus student name
+    const studentInput = document.getElementById('issueStudentName');
+    if (studentInput) studentInput.focus();
+
+    showNotification('Component selected: ' + componentName + '. Fill in student details.');
+}
+
+// -------------------------------------------------------
+// ISSUE FORM — MAX QTY UPDATE
+// -------------------------------------------------------
+
+function updateMaxQty() {
+    const select = document.getElementById('issueComponentSelect');
+    const qtyInput = document.getElementById('issueQty');
+    const maxLabel = document.getElementById('maxQtyLabel');
+
+    if (!select || !qtyInput) return;
+
+    const selectedOption = select.options[select.selectedIndex];
+    const maxQty = parseInt(selectedOption?.dataset?.qty) || 0;
+
+    qtyInput.max = maxQty;
+    if (parseInt(qtyInput.value) > maxQty) qtyInput.value = maxQty;
+    if (maxLabel) maxLabel.textContent = maxQty > 0 ? 'Max available: ' + maxQty : 'Out of stock';
+}
+
+// -------------------------------------------------------
+// ISSUE FORM — SUBMIT
+// -------------------------------------------------------
+
+async function submitIssueForm(event) {
+    event.preventDefault();
+
+    const studentName  = (document.getElementById('issueStudentName')?.value || '').trim();
+    const studentId    = (document.getElementById('issueStudentId')?.value || '').trim();
+    const select       = document.getElementById('issueComponentSelect');
+    const componentId  = select?.value || '';
+    const componentName = select?.options[select.selectedIndex]?.dataset?.name || '';
+    const qty          = parseInt(document.getElementById('issueQty')?.value) || 1;
+
+    // Validation
+    if (!studentName) { showNotification('Enter student name', 'warning'); return; }
+    if (!studentId)   { showNotification('Enter student ID', 'warning'); return; }
+    if (!componentId) { showNotification('Select a component', 'warning'); return; }
+    if (qty < 1)      { showNotification('Quantity must be at least 1', 'warning'); return; }
+
+    const maxQty = parseInt(select.options[select.selectedIndex]?.dataset?.qty) || 0;
+    if (qty > maxQty) {
+        showNotification('Only ' + maxQty + ' units available', 'error');
+        return;
+    }
+
+    showLoading();
+    try {
+        const result = await apiCall('addIssuance', {
+            data: {
+                studentName:   studentName,
+                studentId:     studentId,
+                componentId:   componentId,
+                componentName: componentName,
+                qtyIssued:     qty
+            }
+        });
+
+        if (result.success) {
+            showNotification('Component issued successfully. ID: ' + result.id);
+            resetIssueForm();
+            loadIssuances();
+        } else {
+            showNotification(result.error || 'Failed to issue component', 'error');
+        }
+    } catch (e) {
+        console.error('submitIssueForm error', e);
+        showNotification('Error issuing component', 'error');
+    }
+    hideLoading();
+}
+
+function resetIssueForm() {
+    const form = document.getElementById('issueComponentForm');
+    if (form) form.reset();
+
+    const maxLabel = document.getElementById('maxQtyLabel');
+    if (maxLabel) maxLabel.textContent = '';
+}
+
+// -------------------------------------------------------
+// FILTERS & SEARCH
+// -------------------------------------------------------
+
+function applyIssuanceFilters() {
+    const searchVal   = (document.getElementById('issuanceSearch')?.value || '').toLowerCase();
+    const statusVal   = document.getElementById('issuanceFilterStatus')?.value || '';
+    const componentVal = document.getElementById('issuanceFilterComponent')?.value || '';
+
+    const filtered = allIssuances.filter(function(i) {
+        const matchSearch = !searchVal ||
+            (i.StudentName  || '').toLowerCase().includes(searchVal) ||
+            (i.StudentID    || '').toLowerCase().includes(searchVal) ||
+            (i.ComponentName|| '').toLowerCase().includes(searchVal) ||
+            (i.IssuanceID   || '').toLowerCase().includes(searchVal);
+
+        const matchStatus    = !statusVal    || i.Status      === statusVal;
+        const matchComponent = !componentVal || i.ComponentID === componentVal;
+
+        return matchSearch && matchStatus && matchComponent;
+    });
+
+    renderIssuancesTable(filtered);
+}
+
+// -------------------------------------------------------
+// RENDER TABLE
+// -------------------------------------------------------
+
+function renderIssuancesTable(issuances) {
+    const tbody = document.getElementById('issuancesTableBody');
+    if (!tbody) return;
+
+    if (!issuances || !issuances.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No issuance records found</td></tr>';
+        return;
+    }
+
+    let html = '';
+
+    issuances.forEach(function(i) {
+        const isIssued      = i.Status === 'Issued';
+        const statusClass   = isIssued ? 'status-issued' : 'status-returned';
+        const statusLabel   = isIssued ? 'Issued' : 'Returned';
+
+        // Escape single quotes for inline onclick
+        const safeComponent = (i.ComponentName || '').replace(/'/g, "\\'");
+        const safeStudent   = (i.StudentName   || '').replace(/'/g, "\\'");
+
+        html += '<tr>' +
+            '<td><code>' + escapeHtml(i.IssuanceID) + '</code></td>' +
+            '<td>' +
+                '<div class="student-info">' +
+                    '<span class="student-name">' + escapeHtml(i.StudentName) + '</span>' +
+                    '<span class="student-id">' + escapeHtml(i.StudentID) + '</span>' +
+                '</div>' +
+            '</td>' +
+            '<td>' +
+                '<div class="student-info">' +
+                    '<span class="student-name">' + escapeHtml(i.ComponentName) + '</span>' +
+                    '<span class="student-id">' + escapeHtml(i.ComponentID) + '</span>' +
+                '</div>' +
+            '</td>' +
+            '<td><strong>' + escapeHtml(String(i.QtyIssued || '')) + '</strong></td>' +
+            '<td>' + formatDate(i.DateIssued) + '</td>' +
+            '<td>' + (i.DateReturned ? formatDate(i.DateReturned) : '-') + '</td>' +
+            '<td><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></td>' +
+            '<td class="actions">' +
+                (isIssued
+                    ? '<button class="btn btn-sm btn-success" onclick="confirmReturn(\'' + i.IssuanceID + '\',\'' + safeComponent + '\',\'' + safeStudent + '\')">Mark Returned</button>'
+                    : '') +
+                '<button class="btn btn-sm btn-danger" onclick="confirmDeleteIssuance(\'' + i.IssuanceID + '\')">Delete</button>' +
+            '</td>' +
+        '</tr>';
+    });
+
+    tbody.innerHTML = html;
+}
+
+// -------------------------------------------------------
+// RETURN
+// -------------------------------------------------------
+
+function confirmReturn(issuanceId, componentName, studentName) {
+    if (confirm('Mark "' + componentName + '" as returned by ' + studentName + '?')) {
+        markReturned(issuanceId);
+    }
+}
+
+async function markReturned(issuanceId) {
+    showLoading();
+    try {
+        const result = await apiCall('returnIssuance', { id: issuanceId });
+
+        if (result.success) {
+            showNotification('Component marked as returned');
+            loadIssuances();
+        } else {
+            showNotification(result.error || 'Failed to mark as returned', 'error');
+        }
+    } catch (e) {
+        console.error('markReturned error', e);
+        showNotification('Error marking as returned', 'error');
+    }
+    hideLoading();
+}
+
+// -------------------------------------------------------
+// DELETE ISSUANCE
+// -------------------------------------------------------
+
+function confirmDeleteIssuance(issuanceId) {
+    if (confirm('Are you sure you want to delete this issuance record?\n\nThis cannot be undone.')) {
+        deleteIssuance(issuanceId);
+    }
+}
+
+async function deleteIssuance(issuanceId) {
+    showLoading();
+    try {
+        const result = await apiCall('deleteIssuance', { id: issuanceId });
+
+        if (result.success) {
+            showNotification('Issuance record deleted');
+            loadIssuances();
+        } else {
+            showNotification(result.error || 'Failed to delete record', 'error');
+        }
+    } catch (e) {
+        console.error('deleteIssuance error', e);
+        showNotification('Error deleting record', 'error');
+    }
+    hideLoading();
+}
+
+// -------------------------------------------------------
+// TAB SWITCHING (for components page with inventory + issuances tabs)
+// -------------------------------------------------------
+
+function switchIssuanceTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.issuance-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    const activeBtn = document.querySelector('.issuance-tab-btn[data-tab="' + tabName + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // Update tab panels
+    document.querySelectorAll('.issuance-tab-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+    });
+    const activePanel = document.getElementById('issuanceTab-' + tabName);
+    if (activePanel) activePanel.classList.add('active');
+
+    // Load data when switching to issuances tab
+    if (tabName === 'issuances' && allIssuances.length === 0) {
+        loadIssuances();
+    }
+}
+
+// -------------------------------------------------------
+// STUDENT HISTORY MODAL
+// -------------------------------------------------------
+
+async function viewStudentHistory(studentId) {
+    showLoading();
+    try {
+        const result = await apiCall('getIssuancesByStudent', { id: studentId });
+        const records = result.data || [];
+
+        const student = allIssuances.find(function(i) { return i.StudentID === studentId; });
+        const studentName = student ? student.StudentName : studentId;
+
+        let html = '<div class="student-history">';
+        html += '<div class="history-header">';
+        html += '<h4>' + escapeHtml(studentName) + '</h4>';
+        html += '<span class="student-id-badge">' + escapeHtml(studentId) + '</span>';
+        html += '</div>';
+        html += '<div class="history-stats">';
+        html += '<span>Total: <strong>' + records.length + '</strong></span>';
+        html += '<span>Active: <strong>' + records.filter(function(r) { return r.Status === 'Issued'; }).length + '</strong></span>';
+        html += '<span>Returned: <strong>' + records.filter(function(r) { return r.Status === 'Returned'; }).length + '</strong></span>';
+        html += '</div>';
+
+        if (records.length) {
+            html += '<table class="history-table"><thead><tr>';
+            html += '<th>ID</th><th>Component</th><th>Qty</th><th>Issued</th><th>Returned</th><th>Status</th>';
+            html += '</tr></thead><tbody>';
+
+            records.forEach(function(r) {
+                const statusClass = r.Status === 'Issued' ? 'status-issued' : 'status-returned';
+                html += '<tr>' +
+                    '<td><code>' + escapeHtml(r.IssuanceID) + '</code></td>' +
+                    '<td>' + escapeHtml(r.ComponentName) + '</td>' +
+                    '<td>' + escapeHtml(String(r.QtyIssued || '')) + '</td>' +
+                    '<td>' + formatDate(r.DateIssued) + '</td>' +
+                    '<td>' + (r.DateReturned ? formatDate(r.DateReturned) : '-') + '</td>' +
+                    '<td><span class="status-badge ' + statusClass + '">' + escapeHtml(r.Status) + '</span></td>' +
+                    '</tr>';
+            });
+
+            html += '</tbody></table>';
+        } else {
+            html += '<p class="no-data">No records found for this student</p>';
+        }
+
+        html += '</div>';
+
+        document.getElementById('studentHistoryBody').innerHTML = html;
+        document.getElementById('studentHistoryModal').classList.add('show');
+
+    } catch (e) {
+        console.error('viewStudentHistory error', e);
+        showNotification('Failed to load student history', 'error');
+    }
+    hideLoading();
+}
+
+function closeStudentHistoryModal() {
+    document.getElementById('studentHistoryModal').classList.remove('show');
+}
+
+// -------------------------------------------------------
+// EXPORT ISSUANCES
+// -------------------------------------------------------
+
+function exportIssuances() {
+    if (!allIssuances.length) {
+        showNotification('No issuance records to export', 'warning');
+        return;
+    }
+
+    const data = allIssuances.map(function(i) {
+        return {
+            'Issuance ID':     i.IssuanceID,
+            'Student Name':    i.StudentName,
+            'Student ID':      i.StudentID,
+            'Component':       i.ComponentName,
+            'Component ID':    i.ComponentID,
+            'Qty Issued':      i.QtyIssued,
+            'Date Issued':     formatDate(i.DateIssued),
+            'Date Returned':   i.DateReturned ? formatDate(i.DateReturned) : '',
+            'Status':          i.Status
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Issuances');
+    XLSX.writeFile(wb, 'ATL_Issuances_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    showNotification('Issuances exported!');
+}
+
 console.log('✅ Script.js loaded');
