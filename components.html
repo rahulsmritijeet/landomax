@@ -1,22 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Components - Throttle</title>
-  <link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Components - ATL Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- Loader -->
-  <div id="loader" style="display:none;" class="loader-overlay">
-    <div class="spinner"></div>
-  </div>
+    <!-- Loader -->
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
 
-   <header class="header">
+    <!-- Header -->
+    <header class="header">
         <div class="header-content">
             <div class="logo">
-                <div class="logo-icon">🔬</div>
+                <div class="logo-icon">T</div>
                 Throttle by RahulS
             </div>
             <nav class="nav">
@@ -30,292 +32,281 @@
             </nav>
         </div>
     </header>
-<!-- Sidebar / Nav — keep whatever you already have -->
 
-  <div class="page-container">
+    <!-- Main Content -->
+    <main class="container">
 
-    <!-- Page Header -->
-    <div class="page-header">
-      <div class="page-header-left">
-        <h1>Components</h1>
-        <p class="page-subtitle">Inventory and issuance management</p>
-      </div>
-      <div class="page-header-right">
-        <button class="btn btn-secondary" onclick="exportComponentsToExcel()">Export</button>
-        <button class="btn btn-secondary" onclick="openImportModal()">Import Excel</button>
-        <a href="component_form.html" class="btn btn-primary">+ Add Component</a>
-      </div>
-    </div>
-
-    <!-- Tab Navigation -->
-    <div class="tab-nav">
-      <button class="issuance-tab-btn active" data-tab="inventory" onclick="switchIssuanceTab('inventory')">
-        Inventory
-      </button>
-      <button class="issuance-tab-btn" data-tab="issuances" onclick="switchIssuanceTab('issuances')">
-        Issuances
-      </button>
-    </div>
-
-    <!-- ================================================ -->
-    <!-- TAB: INVENTORY                                   -->
-    <!-- ================================================ -->
-    <div class="issuance-tab-panel active" id="issuanceTab-inventory">
-
-      <!-- Stats Row -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-number" id="totalComponents">-</div>
-          <div class="stat-label">Total</div>
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-left">
+                <h1 class="page-title">Components</h1>
+                <p class="page-subtitle">Inventory and issuance management</p>
+            </div>
+            <div class="page-header-right">
+                <button class="btn btn-secondary" onclick="exportComponentsToExcel()">Export</button>
+                <button class="btn btn-secondary" onclick="openImportModal()">Import Excel</button>
+                <a href="component_form.html" class="btn btn-primary">+ Add Component</a>
+            </div>
         </div>
-        <div class="stat-card success">
-          <div class="stat-number" id="inStockCount">-</div>
-          <div class="stat-label">In Stock</div>
-        </div>
-        <div class="stat-card warning">
-          <div class="stat-number" id="lowStockCount">-</div>
-          <div class="stat-label">Low Stock</div>
-        </div>
-        <div class="stat-card danger">
-          <div class="stat-number" id="outOfStockCount">-</div>
-          <div class="stat-label">Out of Stock</div>
-        </div>
-      </div>
 
-      <!-- Search and Filter -->
-      <div class="table-toolbar">
-        <input
-          type="text"
-          id="searchComponents"
-          class="search-input"
-          placeholder="Search components..."
-          oninput="searchComponents()"
-        >
-        <div class="filter-tabs">
-          <button class="filter-tab active" onclick="filterComponentsByStock('all', this)">All</button>
-          <button class="filter-tab" onclick="filterComponentsByStock('instock', this)">In Stock</button>
-          <button class="filter-tab" onclick="filterComponentsByStock('low', this)">Low Stock</button>
-          <button class="filter-tab" onclick="filterComponentsByStock('out', this)">Out of Stock</button>
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="issuance-tab-btn active" data-tab="inventory" onclick="switchIssuanceTab('inventory')">Inventory</button>
+            <button class="issuance-tab-btn" data-tab="issuances" onclick="switchIssuanceTab('issuances')">Issuances</button>
         </div>
-      </div>
 
-      <!-- Components Table -->
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="componentsTableBody">
-            <tr><td colspan="6" class="no-data">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- ==================== TAB: INVENTORY ==================== -->
+        <div class="issuance-tab-panel active" id="issuanceTab-inventory">
 
-    </div>
-    <!-- end inventory tab -->
-
-    <!-- ================================================ -->
-    <!-- TAB: ISSUANCES                                   -->
-    <!-- ================================================ -->
-    <div class="issuance-tab-panel" id="issuanceTab-issuances">
-
-      <!-- Summary Cards -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-number" id="issuanceTotalRecords">-</div>
-          <div class="stat-label">Total Records</div>
-        </div>
-        <div class="stat-card danger">
-          <div class="stat-number" id="issuanceCurrentlyIssued">-</div>
-          <div class="stat-label">Currently Issued</div>
-        </div>
-        <div class="stat-card success">
-          <div class="stat-number" id="issuanceReturned">-</div>
-          <div class="stat-label">Returned</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number" id="issuanceUniqueStudents">-</div>
-          <div class="stat-label">Unique Students</div>
-        </div>
-      </div>
-
-      <!-- Issue Form -->
-      <div class="form-card">
-        <h3 class="form-card-title">Issue Component to Student</h3>
-        <form id="issueComponentForm" onsubmit="submitIssueForm(event)">
-          <div class="form-grid-2">
-
-            <div class="form-group">
-              <label for="issueStudentName">Student Name *</label>
-              <input type="text" id="issueStudentName" placeholder="Full name" required>
+            <!-- Stats -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-number" id="totalComponents">-</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-info">
+                        <span class="stat-number" id="inStockCount">-</span>
+                        <span class="stat-label">In Stock</span>
+                    </div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-info">
+                        <span class="stat-number" id="lowStockCount">-</span>
+                        <span class="stat-label">Low Stock</span>
+                    </div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-info">
+                        <span class="stat-number" id="outOfStockCount">-</span>
+                        <span class="stat-label">Out of Stock</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-              <label for="issueStudentId">Student ID *</label>
-              <input type="text" id="issueStudentId" placeholder="e.g. STU001" required>
+            <!-- Search and Filters -->
+            <div class="table-toolbar">
+                <input type="text" id="searchComponents" class="search-input" placeholder="Search components..." oninput="searchComponents()">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterComponentsByStock('all', this)">All</button>
+                    <button class="filter-tab" onclick="filterComponentsByStock('instock', this)">In Stock</button>
+                    <button class="filter-tab" onclick="filterComponentsByStock('low', this)">Low Stock</button>
+                    <button class="filter-tab" onclick="filterComponentsByStock('out', this)">Out of Stock</button>
+                </div>
             </div>
 
-            <div class="form-group">
-              <label for="issueComponentSelect">Component *</label>
-              <select id="issueComponentSelect" required onchange="updateMaxQty()">
-                <option value="">Select component...</option>
-              </select>
+            <!-- Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="componentsTableBody">
+                        <tr><td colspan="6" class="no-data">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: ISSUANCES ==================== -->
+        <div class="issuance-tab-panel" id="issuanceTab-issuances">
+
+            <!-- Summary Cards -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-number" id="issuanceTotalRecords">-</span>
+                        <span class="stat-label">Total Records</span>
+                    </div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-info">
+                        <span class="stat-number" id="issuanceCurrentlyIssued">-</span>
+                        <span class="stat-label">Currently Issued</span>
+                    </div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-info">
+                        <span class="stat-number" id="issuanceReturned">-</span>
+                        <span class="stat-label">Returned</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-number" id="issuanceUniqueStudents">-</span>
+                        <span class="stat-label">Students</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-              <label for="issueQty">Quantity *</label>
-              <input type="number" id="issueQty" value="1" min="1" required>
-              <small id="maxQtyLabel" class="form-hint"></small>
+            <!-- Issue Form -->
+            <div class="form-card">
+                <h3 class="form-card-title">Issue Components to Student</h3>
+                <form id="issueComponentForm" onsubmit="submitIssuanceForm(event)">
+
+                    <!-- Student Name -->
+                    <div class="form-group">
+                        <label for="issueStudentName">Student Name *</label>
+                        <input type="text" id="issueStudentName" placeholder="Full name" required>
+                    </div>
+
+                    <!-- Add Components -->
+                    <div class="form-group">
+                        <label>Add Components</label>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                            <div style="flex:2;min-width:200px;">
+                                <select id="issueComponentSelect" onchange="updateAddQtyMax()">
+                                    <option value="">Select component...</option>
+                                </select>
+                            </div>
+                            <div style="flex:0 0 80px;">
+                                <input type="number" id="addItemQty" value="1" min="1" placeholder="Qty">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="addToIssuanceCart()">+ Add</button>
+                            </div>
+                        </div>
+                        <small id="addItemHint" class="form-hint"></small>
+                    </div>
+
+                    <!-- Cart -->
+                    <div class="form-group">
+                        <label>Components to Issue (<span id="issuanceCartCount">0</span>)</label>
+                        <div id="issuanceCartItems">
+                            <div class="no-data" style="padding:24px;">No components added yet. Select components above.</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="clearIssuanceCart()">Clear All</button>
+                        <button type="submit" class="btn btn-primary" id="submitIssuanceBtn" disabled>Issue Components</button>
+                    </div>
+                </form>
             </div>
 
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-secondary" onclick="resetIssueForm()">Clear</button>
-            <button type="submit" class="btn btn-primary">Issue Component</button>
-          </div>
-        </form>
-      </div>
+            <!-- Filters -->
+            <div class="table-toolbar">
+                <input type="text" id="issuanceSearch" class="search-input" placeholder="Search by student or component..." oninput="applyIssuanceFilters()">
+                <select id="issuanceFilterStatus" class="filter-select" onchange="applyIssuanceFilters()">
+                    <option value="">All Statuses</option>
+                    <option value="Issued">Issued</option>
+                    <option value="Returned">Returned</option>
+                </select>
+                <select id="issuanceFilterComponent" class="filter-select" onchange="applyIssuanceFilters()">
+                    <option value="">All Components</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="exportIssuances()">Export</button>
+            </div>
 
-      <!-- Filter Bar -->
-      <div class="table-toolbar">
-        <input
-          type="text"
-          id="issuanceSearch"
-          class="search-input"
-          placeholder="Search by student name, ID or component..."
-          oninput="applyIssuanceFilters()"
-        >
-        <select id="issuanceFilterStatus" class="filter-select" onchange="applyIssuanceFilters()">
-          <option value="">All Statuses</option>
-          <option value="Issued">Issued</option>
-          <option value="Returned">Returned</option>
-        </select>
-        <select id="issuanceFilterComponent" class="filter-select" onchange="applyIssuanceFilters()">
-          <option value="">All Components</option>
-        </select>
-        <button class="btn btn-secondary" onclick="exportIssuances()">Export</button>
-      </div>
-
-      <!-- Issuances Table -->
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Student</th>
-              <th>Component</th>
-              <th>Qty</th>
-              <th>Date Issued</th>
-              <th>Date Returned</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="issuancesTableBody">
-            <tr><td colspan="8" class="no-data">Switch to this tab to load records</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-    <!-- end issuances tab -->
-
-  </div>
-  <!-- end page-container -->
-
-  <!-- ================================================ -->
-  <!-- QUANTITY MODAL                                   -->
-  <!-- ================================================ -->
-  <div id="quantityModal" class="modal">
-    <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h3>Update Quantity</h3>
-        <button class="modal-close" onclick="closeQuantityModal()">x</button>
-      </div>
-      <div class="modal-body">
-        <p id="quantityComponentName" class="modal-component-name"></p>
-        <div class="quantity-control-row">
-          <button type="button" class="qty-btn" onclick="adjustQuantity(-10)">-10</button>
-          <button type="button" class="qty-btn" onclick="adjustQuantity(-1)">-1</button>
-          <input type="number" id="quantityInput" class="qty-input-lg" min="0">
-          <button type="button" class="qty-btn" onclick="adjustQuantity(1)">+1</button>
-          <button type="button" class="qty-btn" onclick="adjustQuantity(10)">+10</button>
+            <!-- Issuances Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Student</th>
+                            <th>Component</th>
+                            <th>Qty</th>
+                            <th>Issued</th>
+                            <th>Returned</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="issuancesTableBody">
+                        <tr><td colspan="8" class="no-data">Switch to this tab to load records</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeQuantityModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveQuantity()">Save</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- ================================================ -->
-  <!-- IMPORT COMPONENT MODAL                           -->
-  <!-- ================================================ -->
-  <div id="importModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Import Components from Excel</h3>
-        <button class="modal-close" onclick="closeImportModal()">x</button>
-      </div>
-      <div class="modal-body">
-        <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
-          <p>Click or drag and drop an Excel file here</p>
-          <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"
-            onchange="handleFile(this.files[0])">
+    </main>
+
+    <!-- Quantity Modal -->
+    <div id="quantityModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3>Update Quantity</h3>
+                <button class="modal-close" onclick="closeQuantityModal()">x</button>
+            </div>
+            <div class="modal-body">
+                <p id="quantityComponentName" class="modal-component-name"></p>
+                <div class="quantity-control-row">
+                    <button type="button" class="qty-btn" onclick="adjustQuantity(-10)">-10</button>
+                    <button type="button" class="qty-btn" onclick="adjustQuantity(-1)">-1</button>
+                    <input type="number" id="quantityInput" class="qty-input-lg" min="0">
+                    <button type="button" class="qty-btn" onclick="adjustQuantity(1)">+1</button>
+                    <button type="button" class="qty-btn" onclick="adjustQuantity(10)">+10</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeQuantityModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveQuantity()">Save</button>
+            </div>
         </div>
-        <button class="btn btn-secondary" onclick="downloadComponentTemplate()">Download Template</button>
-        <div id="previewSection" style="display:none;">
-          <div id="previewTable"></div>
-          <p id="previewNote"></p>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import Components from Excel</h3>
+                <button class="modal-close" onclick="closeImportModal()">x</button>
+            </div>
+            <div class="modal-body">
+                <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                    <p>Click or drag and drop an Excel file here</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+                </div>
+                <button class="btn btn-secondary" style="margin-top:12px;" onclick="downloadComponentTemplate()">Download Template</button>
+                <div id="previewSection" style="display:none;margin-top:16px;">
+                    <div id="previewTable"></div>
+                    <p id="previewNote" style="font-size:13px;color:var(--text-secondary);margin-top:8px;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirmImportBtn" disabled onclick="confirmImport()">Import</button>
+            </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
-        <button class="btn btn-primary" id="confirmImportBtn" disabled onclick="confirmImport()">Import</button>
-      </div>
     </div>
-  </div>
 
-  <!-- ================================================ -->
-  <!-- STUDENT HISTORY MODAL                            -->
-  <!-- ================================================ -->
-  <div id="studentHistoryModal" class="modal">
-    <div class="modal-content modal-lg">
-      <div class="modal-header">
-        <h3>Student Issuance History</h3>
-        <button class="modal-close" onclick="closeStudentHistoryModal()">x</button>
-      </div>
-      <div class="modal-body" id="studentHistoryBody">
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeStudentHistoryModal()">Close</button>
-      </div>
+    <!-- Student History Modal -->
+    <div id="studentHistoryModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>Student Issuance History</h3>
+                <button class="modal-close" onclick="closeStudentHistoryModal()">x</button>
+            </div>
+            <div class="modal-body" id="studentHistoryBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeStudentHistoryModal()">Close</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Scripts -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/script.js"></script>
-  <script>
-    // Auth check
-    checkAuth();
-    updateSessionInfo();
-
-    // Initialise on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      loadComponents();   // loads inventory tab
-      setupDropZone();    // sets up the import drop zone
-    });
-  </script>
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof checkAuth === 'function' && !checkAuth()) return;
+            if (typeof updateSessionInfo === 'function') updateSessionInfo();
+            loadComponents();
+            setupDropZone();
+        });
+    </script>
 </body>
 </html>
