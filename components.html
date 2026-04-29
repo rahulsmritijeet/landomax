@@ -3,138 +3,191 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Components - ATL Dashboard</title>
+  <title>Components - Throttle</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="container">
 
-    <header class="header">
-      <div class="header-nav">
-        <a href="index.html" class="btn btn-secondary">Back to Home</a>
+  <!-- Loader -->
+  <div id="loader" style="display:none;" class="loader-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Sidebar / Nav — keep whatever you already have -->
+
+  <div class="page-container">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Components</h1>
+        <p class="page-subtitle">Inventory and issuance management</p>
       </div>
-      <h1>Components</h1>
-    </header>
-
-    <!-- Tab Navigation -->
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('inventory')">Inventory</button>
-      <button class="tab-btn" onclick="switchTab('issuances')">Issuances</button>
+      <div class="page-header-right">
+        <button class="btn btn-secondary" onclick="exportComponentsToExcel()">Export</button>
+        <button class="btn btn-secondary" onclick="openImportModal()">Import Excel</button>
+        <a href="component_form.html" class="btn btn-primary">+ Add Component</a>
+      </div>
     </div>
 
-    <!-- ===================== TAB: INVENTORY ===================== -->
-    <div id="tab-inventory" class="tab-panel active">
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="issuance-tab-btn active" data-tab="inventory" onclick="switchIssuanceTab('inventory')">
+        Inventory
+      </button>
+      <button class="issuance-tab-btn" data-tab="issuances" onclick="switchIssuanceTab('issuances')">
+        Issuances
+      </button>
+    </div>
 
-      <div class="action-bar">
-        <a href="component-form.html" class="btn btn-primary">+ Add Component</a>
+    <!-- ================================================ -->
+    <!-- TAB: INVENTORY                                   -->
+    <!-- ================================================ -->
+    <div class="issuance-tab-panel active" id="issuanceTab-inventory">
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-number" id="totalComponents">-</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-number" id="inStockCount">-</div>
+          <div class="stat-label">In Stock</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-number" id="lowStockCount">-</div>
+          <div class="stat-label">Low Stock</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-number" id="outOfStockCount">-</div>
+          <div class="stat-label">Out of Stock</div>
+        </div>
+      </div>
+
+      <!-- Search and Filter -->
+      <div class="table-toolbar">
         <input
           type="text"
           id="searchComponents"
           class="search-input"
           placeholder="Search components..."
-          onkeyup="App.filterCards('searchComponents', 'component-card')"
+          oninput="searchComponents()"
         >
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="filterComponentsByStock('all', this)">All</button>
+          <button class="filter-tab" onclick="filterComponentsByStock('instock', this)">In Stock</button>
+          <button class="filter-tab" onclick="filterComponentsByStock('low', this)">Low Stock</button>
+          <button class="filter-tab" onclick="filterComponentsByStock('out', this)">Out of Stock</button>
+        </div>
       </div>
 
-      <div id="loadingInventory" class="loading">
-        <div class="spinner"></div>
-        <p>Loading components...</p>
+      <!-- Components Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="componentsTableBody">
+            <tr><td colspan="6" class="no-data">Loading...</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <div id="componentsGrid" class="components-grid" style="display: none;"></div>
-
-      <div id="emptyInventory" class="empty-state" style="display: none;">
-        <p>No components found. Add your first component!</p>
-        <a href="component-form.html" class="btn btn-primary">+ Add Component</a>
-      </div>
     </div>
+    <!-- end inventory tab -->
 
-    <!-- ===================== TAB: ISSUANCES ===================== -->
-    <div id="tab-issuances" class="tab-panel">
+    <!-- ================================================ -->
+    <!-- TAB: ISSUANCES                                   -->
+    <!-- ================================================ -->
+    <div class="issuance-tab-panel" id="issuanceTab-issuances">
 
-      <!-- Summary -->
-      <div class="summary-bar" id="summaryBar">
-        <div class="summary-card">
-          <span class="summary-number" id="summaryTotal">-</span>
-          <span class="summary-label">Total Records</span>
+      <!-- Summary Cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-number" id="issuanceTotalRecords">-</div>
+          <div class="stat-label">Total Records</div>
         </div>
-        <div class="summary-card danger">
-          <span class="summary-number" id="summaryIssued">-</span>
-          <span class="summary-label">Currently Issued</span>
+        <div class="stat-card danger">
+          <div class="stat-number" id="issuanceCurrentlyIssued">-</div>
+          <div class="stat-label">Currently Issued</div>
         </div>
-        <div class="summary-card success">
-          <span class="summary-number" id="summaryReturned">-</span>
-          <span class="summary-label">Returned</span>
+        <div class="stat-card success">
+          <div class="stat-number" id="issuanceReturned">-</div>
+          <div class="stat-label">Returned</div>
         </div>
-        <div class="summary-card">
-          <span class="summary-number" id="summaryStudents">-</span>
-          <span class="summary-label">Unique Students</span>
+        <div class="stat-card">
+          <div class="stat-number" id="issuanceUniqueStudents">-</div>
+          <div class="stat-label">Unique Students</div>
         </div>
       </div>
 
-      <!-- Issue Component Form -->
-      <div class="issuance-form">
-        <h3>Issue Component to Student</h3>
-        <form id="issuanceForm">
+      <!-- Issue Form -->
+      <div class="form-card">
+        <h3 class="form-card-title">Issue Component to Student</h3>
+        <form id="issueComponentForm" onsubmit="submitIssueForm(event)">
+          <div class="form-grid-2">
 
-          <div class="form-row">
             <div class="form-group">
-              <label for="studentName">Student Name *</label>
-              <input type="text" id="studentName" required placeholder="Full name">
+              <label for="issueStudentName">Student Name *</label>
+              <input type="text" id="issueStudentName" placeholder="Full name" required>
             </div>
-            <div class="form-group">
-              <label for="studentId">Student ID *</label>
-              <input type="text" id="studentId" required placeholder="e.g., STU001">
-            </div>
-          </div>
 
-          <div class="form-row">
             <div class="form-group">
-              <label for="issueComponent">Component *</label>
-              <select id="issueComponent" required>
+              <label for="issueStudentId">Student ID *</label>
+              <input type="text" id="issueStudentId" placeholder="e.g. STU001" required>
+            </div>
+
+            <div class="form-group">
+              <label for="issueComponentSelect">Component *</label>
+              <select id="issueComponentSelect" required onchange="updateMaxQty()">
                 <option value="">Select component...</option>
               </select>
             </div>
-            <div class="form-group">
-              <label for="qtyIssued">Quantity *</label>
-              <input type="number" id="qtyIssued" required min="1" value="1" placeholder="1">
-            </div>
-          </div>
 
-          <div class="form-actions" style="margin-top: 10px; padding-top: 15px;">
-            <button type="button" class="btn btn-secondary" onclick="resetIssuanceForm()">Clear</button>
+            <div class="form-group">
+              <label for="issueQty">Quantity *</label>
+              <input type="number" id="issueQty" value="1" min="1" required>
+              <small id="maxQtyLabel" class="form-hint"></small>
+            </div>
+
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetIssueForm()">Clear</button>
             <button type="submit" class="btn btn-primary">Issue Component</button>
           </div>
         </form>
       </div>
 
-      <!-- Filters -->
-      <div class="filter-bar">
+      <!-- Filter Bar -->
+      <div class="table-toolbar">
         <input
           type="text"
-          id="searchIssuances"
+          id="issuanceSearch"
           class="search-input"
-          placeholder="Search by student or component..."
-          oninput="applyFilters()"
-          style="min-width: 260px;"
+          placeholder="Search by student name, ID or component..."
+          oninput="applyIssuanceFilters()"
         >
-        <select id="filterStatus" class="filter-select" onchange="applyFilters()">
+        <select id="issuanceFilterStatus" class="filter-select" onchange="applyIssuanceFilters()">
           <option value="">All Statuses</option>
           <option value="Issued">Issued</option>
           <option value="Returned">Returned</option>
         </select>
-        <select id="filterComponent" class="filter-select" onchange="applyFilters()">
+        <select id="issuanceFilterComponent" class="filter-select" onchange="applyIssuanceFilters()">
           <option value="">All Components</option>
         </select>
+        <button class="btn btn-secondary" onclick="exportIssuances()">Export</button>
       </div>
 
       <!-- Issuances Table -->
-      <div id="loadingIssuances" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>Loading records...</p>
-      </div>
-
-      <div id="issuancesTableContainer" class="table-container" style="display: none;">
+      <div class="table-container">
         <table>
           <thead>
             <tr>
@@ -148,315 +201,104 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="issuancesBody"></tbody>
+          <tbody id="issuancesTableBody">
+            <tr><td colspan="8" class="no-data">Switch to this tab to load records</td></tr>
+          </tbody>
         </table>
       </div>
 
-      <div id="emptyIssuances" class="empty-state" style="display: none;">
-        <p>No issuance records found.</p>
-      </div>
-
     </div>
-    <!-- end tab-issuances -->
+    <!-- end issuances tab -->
 
   </div>
-  <!-- end container -->
+  <!-- end page-container -->
 
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
+  <!-- ================================================ -->
+  <!-- QUANTITY MODAL                                   -->
+  <!-- ================================================ -->
+  <div id="quantityModal" class="modal">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h3>Update Quantity</h3>
+        <button class="modal-close" onclick="closeQuantityModal()">x</button>
+      </div>
+      <div class="modal-body">
+        <p id="quantityComponentName" class="modal-component-name"></p>
+        <div class="quantity-control-row">
+          <button type="button" class="qty-btn" onclick="adjustQuantity(-10)">-10</button>
+          <button type="button" class="qty-btn" onclick="adjustQuantity(-1)">-1</button>
+          <input type="number" id="quantityInput" class="qty-input-lg" min="0">
+          <button type="button" class="qty-btn" onclick="adjustQuantity(1)">+1</button>
+          <button type="button" class="qty-btn" onclick="adjustQuantity(10)">+10</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeQuantityModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveQuantity()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================ -->
+  <!-- IMPORT COMPONENT MODAL                           -->
+  <!-- ================================================ -->
+  <div id="importModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Import Components from Excel</h3>
+        <button class="modal-close" onclick="closeImportModal()">x</button>
+      </div>
+      <div class="modal-body">
+        <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+          <p>Click or drag and drop an Excel file here</p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"
+            onchange="handleFile(this.files[0])">
+        </div>
+        <button class="btn btn-secondary" onclick="downloadComponentTemplate()">Download Template</button>
+        <div id="previewSection" style="display:none;">
+          <div id="previewTable"></div>
+          <p id="previewNote"></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+        <button class="btn btn-primary" id="confirmImportBtn" disabled onclick="confirmImport()">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================ -->
+  <!-- STUDENT HISTORY MODAL                            -->
+  <!-- ================================================ -->
+  <div id="studentHistoryModal" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Student Issuance History</h3>
+        <button class="modal-close" onclick="closeStudentHistoryModal()">x</button>
+      </div>
+      <div class="modal-body" id="studentHistoryBody">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeStudentHistoryModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/script.js"></script>
   <script>
+    // Auth check
+    checkAuth();
+    updateSessionInfo();
 
-    // ==================== STATE ====================
-    var allIssuances = [];
-    var allComponents = [];
-
-    // ==================== TAB SWITCHING ====================
-
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.classList.remove('active');
-      });
-      document.querySelectorAll('.tab-panel').forEach(function(panel) {
-        panel.classList.remove('active');
-      });
-
-      document.querySelector('[onclick="switchTab(\'' + tab + '\')"]').classList.add('active');
-      document.getElementById('tab-' + tab).classList.add('active');
-    }
-
-    // ==================== INVENTORY TAB ====================
-
-    async function loadComponents() {
-      document.getElementById('loadingInventory').style.display = 'block';
-
-      try {
-        allComponents = await API.getComponents();
-        displayComponents(allComponents);
-        populateComponentDropdowns(allComponents);
-      } catch (err) {
-        App.handleError(err);
-      }
-    }
-
-    function displayComponents(components) {
-      document.getElementById('loadingInventory').style.display = 'none';
-      var grid = document.getElementById('componentsGrid');
-      var empty = document.getElementById('emptyInventory');
-
-      if (!components || components.length === 0) {
-        empty.style.display = 'block';
-        grid.style.display = 'none';
-        return;
-      }
-
-      empty.style.display = 'none';
-      grid.style.display = 'grid';
-
-      grid.innerHTML = components.map(function(c) {
-        var img = c.ImageURL
-          ? '<img src="' + c.ImageURL + '" alt="' + App.escape(c.ComponentName) + '" onerror="this.parentElement.innerHTML=\'<div class=no-image>[IMG]</div>\'">'
-          : '<div class="no-image">[IMG]</div>';
-
-        return '<div class="component-card" data-search="' + App.escape(c.ComponentName) + ' ' + App.escape(c.Type) + ' ' + App.escape(c.Description) + '">' +
-          '<div class="component-image">' + img + '</div>' +
-          '<div class="component-info">' +
-            '<span class="badge">' + App.escape(c.ComponentID) + '</span>' +
-            '<h3>' + App.escape(c.ComponentName) + '</h3>' +
-            '<span class="component-type">' + App.escape(c.Type) + '</span>' +
-            '<p>' + (c.Description ? App.escape(c.Description) : 'No description') + '</p>' +
-            '<div style="display:flex; gap:8px; margin-top:8px;">' +
-              '<button class="btn btn-sm btn-secondary" onclick="editComponent(\'' + c.ComponentID + '\')">Edit</button>' +
-              '<button class="btn btn-sm btn-primary" onclick="quickIssue(\'' + c.ComponentID + '\', \'' + App.escape(c.ComponentName) + '\')">Issue</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-    }
-
-    function editComponent(id) {
-      window.location.href = 'component-form.html?id=' + id;
-    }
-
-    // ==================== QUICK ISSUE FROM INVENTORY ====================
-
-    function quickIssue(componentId, componentName) {
-      switchTab('issuances');
-      document.getElementById('issueComponent').value = componentId;
-      document.getElementById('studentName').focus();
-      App.notify('Component selected: ' + componentName + '. Fill in student details.', 'success');
-    }
-
-    // ==================== ISSUANCES TAB ====================
-
-    async function loadIssuances() {
-      document.getElementById('loadingIssuances').style.display = 'block';
-      document.getElementById('issuancesTableContainer').style.display = 'none';
-
-      try {
-        allIssuances = await API.getIssuances();
-        updateSummary(allIssuances);
-        applyFilters();
-        document.getElementById('loadingIssuances').style.display = 'none';
-      } catch (err) {
-        App.handleError(err);
-        document.getElementById('loadingIssuances').style.display = 'none';
-      }
-    }
-
-    function updateSummary(issuances) {
-      var issued = issuances.filter(function(i) { return i.Status === 'Issued'; });
-      var returned = issuances.filter(function(i) { return i.Status === 'Returned'; });
-      var studentIds = [...new Set(issuances.map(function(i) { return i.StudentID; }))];
-
-      document.getElementById('summaryTotal').textContent = issuances.length;
-      document.getElementById('summaryIssued').textContent = issued.length;
-      document.getElementById('summaryReturned').textContent = returned.length;
-      document.getElementById('summaryStudents').textContent = studentIds.length;
-    }
-
-    function applyFilters() {
-      var search = (document.getElementById('searchIssuances').value || '').toLowerCase();
-      var statusFilter = document.getElementById('filterStatus').value;
-      var componentFilter = document.getElementById('filterComponent').value;
-
-      var filtered = allIssuances.filter(function(i) {
-        var matchSearch = !search ||
-          (i.StudentName || '').toLowerCase().includes(search) ||
-          (i.StudentID || '').toLowerCase().includes(search) ||
-          (i.ComponentName || '').toLowerCase().includes(search) ||
-          (i.IssuanceID || '').toLowerCase().includes(search);
-
-        var matchStatus = !statusFilter || i.Status === statusFilter;
-        var matchComponent = !componentFilter || i.ComponentID === componentFilter;
-
-        return matchSearch && matchStatus && matchComponent;
-      });
-
-      displayIssuances(filtered);
-    }
-
-    function displayIssuances(issuances) {
-      var tbody = document.getElementById('issuancesBody');
-      var table = document.getElementById('issuancesTableContainer');
-      var empty = document.getElementById('emptyIssuances');
-
-      if (!issuances || issuances.length === 0) {
-        empty.style.display = 'block';
-        table.style.display = 'none';
-        return;
-      }
-
-      empty.style.display = 'none';
-      table.style.display = 'block';
-
-      tbody.innerHTML = issuances.map(function(i) {
-        var isIssued = i.Status === 'Issued';
-        var statusClass = isIssued ? 'status-issued' : 'status-returned';
-
-        return '<tr>' +
-          '<td><span class="badge">' + App.escape(i.IssuanceID) + '</span></td>' +
-          '<td>' +
-            '<div class="student-info">' +
-              '<span class="student-name">' + App.escape(i.StudentName) + '</span>' +
-              '<span class="student-id">' + App.escape(i.StudentID) + '</span>' +
-            '</div>' +
-          '</td>' +
-          '<td>' +
-            '<div class="student-info">' +
-              '<span class="student-name">' + App.escape(i.ComponentName) + '</span>' +
-              '<span class="student-id">' + App.escape(i.ComponentID) + '</span>' +
-            '</div>' +
-          '</td>' +
-          '<td><strong>' + App.escape(String(i.QtyIssued)) + '</strong></td>' +
-          '<td>' + App.formatDate(i.DateIssued) + '</td>' +
-          '<td>' + (i.DateReturned ? App.formatDate(i.DateReturned) : '-') + '</td>' +
-          '<td><span class="status-badge ' + statusClass + '">' + App.escape(i.Status) + '</span></td>' +
-          '<td class="actions">' +
-            (isIssued
-              ? '<button class="btn btn-sm btn-primary" onclick="confirmReturn(\'' + i.IssuanceID + '\', \'' + App.escape(i.ComponentName) + '\', \'' + App.escape(i.StudentName) + '\')">Mark Returned</button>'
-              : '') +
-            '<button class="btn btn-sm btn-danger" onclick="confirmDeleteIssuance(\'' + i.IssuanceID + '\')">Delete</button>' +
-          '</td>' +
-        '</tr>';
-      }).join('');
-    }
-
-    // ==================== ISSUE FORM SUBMIT ====================
-
-    document.getElementById('issuanceForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      await issueComponent();
-    });
-
-    async function issueComponent() {
-      var selectedOption = document.getElementById('issueComponent');
-      var selectedComponentId = selectedOption.value;
-      var selectedComponentName = selectedOption.options[selectedOption.selectedIndex].text;
-
-      var data = {
-        studentName: document.getElementById('studentName').value.trim(),
-        studentId: document.getElementById('studentId').value.trim(),
-        componentId: selectedComponentId,
-        componentName: selectedComponentName,
-        qtyIssued: parseInt(document.getElementById('qtyIssued').value)
-      };
-
-      if (!data.studentName || !data.studentId || !data.componentId || !data.qtyIssued) {
-        App.notify('Please fill in all required fields', 'error');
-        return;
-      }
-
-      if (data.qtyIssued < 1) {
-        App.notify('Quantity must be at least 1', 'error');
-        return;
-      }
-
-      try {
-        var result = await API.addIssuance(data);
-        if (result.success) {
-          App.notify('Component issued successfully. ID: ' + result.id, 'success');
-          resetIssuanceForm();
-          loadIssuances();
-        } else {
-          App.handleError({ message: result.error });
-        }
-      } catch (err) {
-        App.handleError(err);
-      }
-    }
-
-    function resetIssuanceForm() {
-      document.getElementById('studentName').value = '';
-      document.getElementById('studentId').value = '';
-      document.getElementById('issueComponent').value = '';
-      document.getElementById('qtyIssued').value = '1';
-    }
-
-    // ==================== RETURN ====================
-
-    function confirmReturn(id, componentName, studentName) {
-      if (confirm('Mark "' + componentName + '" as returned by ' + studentName + '?')) {
-        returnComponent(id);
-      }
-    }
-
-    async function returnComponent(id) {
-      try {
-        var result = await API.returnIssuance(id);
-        if (result.success) {
-          App.notify('Component marked as returned', 'success');
-          loadIssuances();
-        } else {
-          App.handleError({ message: result.error });
-        }
-      } catch (err) {
-        App.handleError(err);
-      }
-    }
-
-    // ==================== DELETE ISSUANCE ====================
-
-    function confirmDeleteIssuance(id) {
-      if (confirm('Are you sure you want to delete this issuance record?\n\nThis cannot be undone.')) {
-        deleteIssuance(id);
-      }
-    }
-
-    async function deleteIssuance(id) {
-      try {
-        var result = await API.deleteIssuance(id);
-        if (result.success) {
-          App.notify('Record deleted', 'success');
-          loadIssuances();
-        } else {
-          App.handleError({ message: result.error });
-        }
-      } catch (err) {
-        App.handleError(err);
-      }
-    }
-
-    // ==================== POPULATE DROPDOWNS ====================
-
-    function populateComponentDropdowns(components) {
-      var issueSelect = document.getElementById('issueComponent');
-      var filterSelect = document.getElementById('filterComponent');
-
-      var options = components.map(function(c) {
-        return '<option value="' + c.ComponentID + '">' + App.escape(c.ComponentName) + ' (' + App.escape(c.Type) + ')</option>';
-      }).join('');
-
-      issueSelect.innerHTML = '<option value="">Select component...</option>' + options;
-      filterSelect.innerHTML = '<option value="">All Components</option>' + options;
-    }
-
-    // ==================== INIT ====================
-
+    // Initialise on page load
     document.addEventListener('DOMContentLoaded', function() {
-      loadComponents();
-      loadIssuances();
+      loadComponents();   // loads inventory tab
+      setupDropZone();    // sets up the import drop zone
     });
-
   </script>
 </body>
 </html>
