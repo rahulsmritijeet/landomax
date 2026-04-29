@@ -3,7 +3,7 @@
 // =====================================================
 
 // Your Google Apps Script Web App URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbyyMRMhScKHR3AquwYNdefnSsRuCb81f7nGbs2zJAM3pU08vsL041VK9mtYOcqA606e_Q/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwesnOZO3C0V83bFBUfQg3Dpidz1kCfZ6NpB98fNC5OFS9IElj1ZLkkUWc2khooQFeURQ/exec';
 
 // Order status options
 const ORDER_STATUS_OPTIONS = ['Ordered', 'Shipped', 'Delivered', 'Completed', 'Cancelled'];
